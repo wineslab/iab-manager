@@ -51,6 +51,7 @@ class PromptWorker(cmd.Cmd):
             mt = self.iab_net.get_mt_by_id(args[0])
         except NetElNotFoundException:
             print("MT not found")
+            return
 
         match args[1]:
             case 'status':

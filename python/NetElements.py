@@ -198,6 +198,13 @@ class NodeRoleSequences:
         NetRoles.UE,
         NetRoles.UE
     ]
+    DEFAULT_5_SRN_SEQUENCE = [
+        NetRoles.CORE,
+        NetRoles.DONOR,
+        NetRoles.MT,
+        NetRoles.MT,
+        NetRoles.MT,
+    ]
 
 
 class NetElNotFoundException(Exception):
