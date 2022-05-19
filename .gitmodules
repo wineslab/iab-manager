@@ -1,0 +1,3 @@
+[submodule "openair-spgwu-tiny"]
+	path = openair-spgwu-tiny
+	url = https://github.com/EugenioMoro/openair-spgwu-tiny.git
