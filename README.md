@@ -5,6 +5,7 @@ ___
 The tool is mainly written in Python and can be executed either on a remote machine or any of the reserved SRNs.
 `iab-manager` makes use of `Fabric` to transparently and remotely run subprocesses on SRNs. 
 
+A modified version of OAI's packet gateway is included as a git submodule. This version allows framed routing, which is required to forward traffic through GTP-tunnels when the destionation IP is different from the endpoint IP. This is currently achieved through cached kernel lookups. TODO: synchronize cache clearing with kernel routing tables changes. 
 
 ## Usage
 ___
