@@ -1,7 +1,7 @@
 from __future__ import annotations
 import cmd
-from NetElements import IabNet, NetElNotFoundException
-from CmdActions import CoreActions, NetActions, DonorActions, MtActions
+from python.NetElements import IabNet, NetElNotFoundException
+from python.CmdActions import CoreActions, NetActions, DonorActions, MtActions
 
 
 class PromptWorker(cmd.Cmd):

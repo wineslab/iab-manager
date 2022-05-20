@@ -1,6 +1,7 @@
 class ShCommands:
     UNAME = 'uname'
-    CAT_SNR_TYPE = 'cat /snr_type'
+    CAT_SNR_TYPE = 'cat /srn_type'
+    PUSH_SRN_TYPE = "echo \'{}\' > /srn_type"
     START_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh start nrf spgwu'
     STOP_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh stop nrf spgwu'
     CORE_STATUS_WCL = 'docker ps | wc -l'

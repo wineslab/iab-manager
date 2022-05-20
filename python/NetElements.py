@@ -1,7 +1,7 @@
 from __future__ import annotations
-import SRN
+import python.SRN
 from typing import List
-from ShCommands import ShCommands
+from python.ShCommands import ShCommands
 
 
 class IabNet:
@@ -21,7 +21,7 @@ class IabNet:
 
     def apply_roles(self, node_role_sequence):
         # check if enough snr
-        if len(node_role_sequence) > len(self.snr_list):
+        if len(node_role_sequence) != len(self.snr_list):
             raise NetRoleMappingFailed("Role sequence list longer than available snrs")
         for seq, role in enumerate(node_role_sequence):
             # check if snr supports role
@@ -72,7 +72,7 @@ class IabNet:
 
 
 class NetElem:
-    srn: SRN.Srn
+    srn: python.SRN.Srn
     start_cmd: str
     stop_cmd: str
     status_cmd: str
@@ -101,7 +101,7 @@ class NetElem:
         return self.srn.run_command(self.status_cmd)
 
     def tostring(self):
-        return "{} id {}".format(self.__class__.__name__, self.srn.id)
+        return "{} id {}".format(self.__class__.__name__, str(self.srn.id))
 
 
 class Du(NetElem):

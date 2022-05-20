@@ -1,4 +1,5 @@
-from NetElements import IabNet, Mt
+from python.NetElements import IabNet, Mt
+
 
 class CoreActions:
     @staticmethod
