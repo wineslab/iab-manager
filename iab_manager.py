@@ -7,6 +7,9 @@
 #    import fabric
 #    from paramiko import SSHConfig
 # from socket import gethostbyname
+import functools
+
+from promise import Promise
 
 
 from pathlib import Path
@@ -81,6 +84,8 @@ def manager_init():
             # else:
             #     srn.push_srn_type('core')
             srn.stat_srn_type()
+            # srn.connection.put(local='bash/run_ue_autoimsi.sh', remote='/root/')
+            # srn.connection.run('chmod +x run_ue_autoimsi.sh', hide=True)
             # assert srn.test_ssh_conn()
             # print('Testing srn connections... ' + str(round((s_i/len(srn_list))*100)) + 'done', end='\r')
 
@@ -106,6 +111,8 @@ def manager_init():
     print("Init Done")
     return iab_network
 
+def promise_callback():
+        print('callback')
 
 if __name__ == '__main__':
     iab_net = manager_init()

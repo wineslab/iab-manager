@@ -1,23 +1,25 @@
 from __future__ import annotations
-import python.SRN
+from python.SRN import Srn
 from typing import List
 from python.ShCommands import ShCommands
 
 
 class IabNet:
-    snr_list: List[SRN.Srn]
+    snr_list: List[Srn]
     core: Core
     donor: Donor
     du_list: List[Du]
     mt_list: List[Mt]
     ue_list: List[Ue]
+    iab_list: List[IabNode]
 
-    def __init__(self, snr_list: list[SRN.Srn]):
+    def __init__(self, snr_list: list[Srn]):
         self.snr_list = snr_list
         self.du_list = []
         self.mt_list = []
         self.ue_list = []
         self.core = Core(snr_list[0])
+        self.iab_list = []
 
     def apply_roles(self, node_role_sequence):
         # check if enough snr
@@ -38,6 +40,8 @@ class IabNet:
                         self.ue_list.append(Ue(self.snr_list[seq]))
                 # save role in srn
                 self.snr_list[seq].net_role = role
+            else:
+                raise NetRoleMappingFailed
 
     @staticmethod
     def __netel_list_tostring(lst: List[NetElem]):
@@ -55,6 +59,12 @@ class IabNet:
     def ue_list_tostring(self):
         return self.__netel_list_tostring(self.ue_list)
 
+    def iab_node_list_tostring(self):
+        if len(self.iab_list) == 0:
+            return "Empty"
+        else:
+            return self.__netel_list_tostring(self.iab_list)
+
     def __get_netel_by_id(self, net_id, lst: List[NetElem]):
         for net_el in lst:
             if net_el.srn.id == net_id:
@@ -70,9 +80,19 @@ class IabNet:
     def get_ue_by_id(self, nid):
         return self.__get_netel_by_id(nid, self.ue_list)
 
+    def add_iab_node(self, mt, du):
+        if mt.iab_node is None and du.iab_node is None:
+            new_node = IabNode(du, mt)
+            self.iab_list.append(new_node)
+            mt.iab_node = new_node
+            du.iab_node = new_node
+            return True
+        else:
+            return False
+
 
 class NetElem:
-    srn: python.SRN.Srn
+    srn: Srn
     start_cmd: str
     stop_cmd: str
     status_cmd: str
@@ -103,54 +123,85 @@ class NetElem:
     def tostring(self):
         return "{} id {}".format(self.__class__.__name__, str(self.srn.id))
 
+    def iface_exists(self, iface: str):
+        res = self.srn.run_command(ShCommands.CHECK_IFACE_EXISTS.format(iface))
+        if res:
+            return res.exited == 0
+
+    def get_tun_ep(self):
+        if self.iface_exists('oaitun_ue1'):
+            res = self.srn.run_command(ShCommands.GET_IFACE_IP.format('oaitun_ue1'))
+            if res:
+                return res.stdout.strip()
+        return False
+
+    def get_tr0_ip(self):
+        if self.iface_exists('tr0'):
+            res = self.srn.run_command(ShCommands.GET_IFACE_IP.format('tr0'))
+            if res:
+                return res.stdout.strip()
+        return False
+
 
 class Du(NetElem):
+    start_cmd = ShCommands.START_DU_TMUX
+    stop_cmd = ShCommands.STOP_SOFTMODEM
+    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+    iab_node: IabNode = None
+
     def __init__(self, srn):
         super().__init__(srn)
-        super().set_commands(
-                         start_cmd=ShCommands.START_DU_TMUX,
-                         stop_cmd=ShCommands.STOP_SOFTMODEM,
-                         status_cmd=ShCommands.SOFTMODEM_STATUS_WCL)
         self.mt = None
+
+    def status(self):
+        res = super().status()
+        if res:
+            return int(res.stdout.strip()) >= 1
+
+    def tostring(self):
+        st = super().tostring()
+        if self.iab_node is not None:
+            return st + "\n Part of iab_node {}".format(self.iab_node.id)
+        else:
+            return st
 
 
 class Mt(NetElem):
+    start_cmd = ShCommands.START_UE_TMUX
+    stop_cmd = ShCommands.STOP_SOFTMODEM
+    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+    iab_node = None
+
     def __init__(self, srn):
         self.du = None
         super().__init__(srn)
-        super().set_commands(
-                         start_cmd=ShCommands.START_UE_TMUX,
-                         stop_cmd=ShCommands.STOP_SOFTMODEM,
-                         status_cmd=ShCommands.SOFTMODEM_STATUS_WCL)
 
     def status(self):
         res = super().status()
         if res:
             return int(res.stdout.strip()) >= 1
 
-
-class Donor(NetElem):
-    def __init__(self, srn):
-        self.du = None
-        super().__init__(srn)
-        super().set_commands(
-                         start_cmd=ShCommands.START_DONOR_TMUX,
-                         stop_cmd=ShCommands.STOP_SOFTMODEM,
-                         status_cmd=ShCommands.SOFTMODEM_STATUS_WCL)
-
-    def status(self):
-        res = super().status()
-        if res:
-            return int(res.stdout.strip()) >= 1
+    def tostring(self):
+        st = super().tostring()
+        if self.iab_node is not None:
+            return st + "\n Part of iab_node {}".format(self.iab_node.id)
+        else:
+            return st
 
 
 class Ue(NetElem):
+    start_cmd = ShCommands.START_UE_TMUX
+    stop_cmd = ShCommands.STOP_SOFTMODEM
+    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+
     def __init__(self, srn):
         self.associated_bs = None
         super().__init__(srn)
-        super().set_commands(stop_cmd=ShCommands.START_UE_TMUX,
-                             start_cmd=ShCommands.STOP_SOFTMODEM,
-                             status_cmd=ShCommands.SOFTMODEM_STATUS_WCL)
+
+    def status(self):
+        res = super().status()
+        if res:
+            return int(res.stdout.strip()) >= 1
 
 
 class Core(NetElem):
@@ -171,10 +222,41 @@ class Core(NetElem):
 
 
 class IabNode:
-    def __init__(self, du, mt):
+    parent: IabNode = None  # or donor
+    children_list: List[IabNode]
+
+    def __init__(self, du: Du, mt: Mt):
         self.du = du
         self.mt = mt
+        self.id = str(mt.srn.id) + str(du.srn.id)
 
+    def set_parent(self, parent):
+        self.parent = parent
+
+    def add_child(self, child):
+        self.children_list.append(child)
+
+    def del_child(self, child):
+        self.children_list.remove(child)
+
+    def tostring(self):
+        st = "IAB Node id {} - Mt id {} - Du id {}".format(self.id, self.mt.srn.id, self.du.srn.id)
+        return st
+
+class Donor(NetElem):
+    start_cmd = ShCommands.START_DONOR_TMUX
+    stop_cmd = ShCommands.STOP_SOFTMODEM
+    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+
+    children_list: List[IabNode]
+
+    def __init__(self, srn):
+        super().__init__(srn)
+
+    def status(self):
+        res = super().status()
+        if res:
+            return int(res.stdout.strip()) >= 1
 
 class NetRoles:
     CORE = 0
