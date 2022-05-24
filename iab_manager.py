@@ -70,6 +70,7 @@ def manager_init():
     if not local:
 
         # create and test gateway connection
+        print("Initializing gateway connection...")
         gw_conn = Connection(host='colosseum-gw', user='eugeniomoro')
         if gw_conn.run('uname', hide=True, warn=False).failed:
             raise Exception('Gateway connection failed')
@@ -78,14 +79,15 @@ def manager_init():
         srn_list = parse_snr_from_reservation('reservations_data/reservation_126023.json')
         print('Testing srn connections...')
         for s_i, srn in enumerate(srn_list):
+            # print(s_i)
             srn.conn_gw = gw_conn
             # if s_i > 1:
             #     srn.push_srn_type('ran')
             # else:
             #     srn.push_srn_type('core')
             srn.stat_srn_type()
-            # srn.connection.put(local='bash/run_ue_autoimsi.sh', remote='/root/')
-            # srn.connection.run('chmod +x run_ue_autoimsi.sh', hide=True)
+            # srn.connection.put(local='bash/run_ue.sh', remote='/root/')
+            # srn.connection.run('chmod +x run_ue.sh', hide=True)
             # assert srn.test_ssh_conn()
             # print('Testing srn connections... ' + str(round((s_i/len(srn_list))*100)) + 'done', end='\r')
 
@@ -111,9 +113,10 @@ def manager_init():
     print("Init Done")
     return iab_network
 
-def promise_callback():
-        print('callback')
 
 if __name__ == '__main__':
     iab_net = manager_init()
+    PromptWorker(iab_net).do_iab_node("add 5 4")
+    PromptWorker(iab_net).do_iab_node("set 45 parent donor")
+    PromptWorker(iab_net).do_iab_node("start 45")
     PromptWorker(iab_net).cmdloop()

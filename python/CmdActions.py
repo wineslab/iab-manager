@@ -1,4 +1,5 @@
 from python.NetElements import IabNet, Mt, Ue, Du, IabNode
+import python.NetTests as NetTests
 
 
 class CoreActions:
@@ -75,79 +76,135 @@ class DonorActions:
 class MtActions:
     @staticmethod
     def status(mt: Mt):
-        print("Checking MT status...")
+        print("Checking MT {} status...".format(mt.id))
         if mt.status():
-            print("MT running")
+            print("MT {} running".format(mt.id))
             return True
         else:
-            print("MT not running")
+            print("MT {} not running".format(mt.id))
             return False
 
     @staticmethod
     def start(mt: Mt):
         if not MtActions.status(mt):
-            print("Starting MT in tmux")
+            print("Starting MT {} in tmux".format(mt.id))
             mt.start()
 
     @staticmethod
     def stop(mt: Mt):
         if MtActions.status(mt):
-            print("Stopping MT")
+            print("Stopping MT {}".format(mt.id))
             mt.stop()
 
 
 class UeActions:
     @staticmethod
     def status(ue: Ue):
-        print("Checking UE status...")
+        print("Checking UE {} status...".format(ue.id))
         if ue.status():
-            print("UE running")
+            print("UE {} running".format(ue.id))
             return True
         else:
-            print("UE not running")
+            print("UE {} not running".format(ue.id))
             return False
 
     @staticmethod
     def start(ue: Ue):
         if not UeActions.status(ue):
-            print("Starting UE in tmux")
+            print("Starting UE {} in tmux".format(ue.id))
             ue.start_disown()
 
     @staticmethod
     def stop(ue: Ue):
         if UeActions.status(ue):
-            print("Stopping UE")
+            print("Stopping UE {}".format(ue.id))
             ue.stop()
 
 
 class DuActions:
     @staticmethod
     def status(du: Du):
-        print("Checking DU status...")
+        print("Checking DU {} status...".format(du.id))
         if du.status():
-            print("DU running")
+            print("DU {} running".format(du.id))
             return True
         else:
-            print("DU not running")
+            print("DU {} not running".format(du.id))
             return False
 
     @staticmethod
     def start(du: Du):
         if not DuActions.status(du):
-            print("Starting DU in tmux")
+            print("Starting DU {} in tmux".format(du.id))
             du.start_disown()
 
     @staticmethod
     def stop(du: Du):
         if DuActions.status(du):
-            print("Stopping DU")
+            print("Stopping DU {}".format(du.id))
             du.stop()
 
 
 class IabNodeActions:
     @staticmethod
     def add(mt: Mt, du: Du, iab_net: IabNet):
-        if iab_net.add_iab_node(mt,du):
+        if iab_net.add_iab_node(mt, du):
             print("Successfully added iab node with id {}".format(iab_net.iab_list[-1].id))
         else:
             print('Add failed')
+
+    @staticmethod
+    def delete(iab_node: IabNode, iab_net: IabNet):
+        iab_net.del_iab_node(iab_node)
+
+    @staticmethod
+    def start(iab_node: IabNode):
+        if iab_node.parent is None:
+            print("IAB node {} does not have a parent".format(iab_node.id))
+            return
+        print("Starting IAB node {}...".format(iab_node.id))
+        if iab_node.du is None:
+            print("IAB node {} has no du".format(iab_node.id))
+            return
+        if iab_node.mt is None:
+            print("IAB node {} has no mt".format(iab_node.id))
+            return
+        rt = True
+        MtActions.start(iab_node.mt)
+        print("Checking if MT {} is ready... (will wait 20s max)".format(iab_node.mt.id))
+        if iab_node.mt.check_softmodem_ready():
+            print("MT {} is ready".format(iab_node.mt.id))
+        else:
+            print("MT {} failed, aborting...")
+            return
+        DuActions.start(iab_node.du)
+        print("Iab node {} started".format(iab_node.id))
+
+
+    @staticmethod
+    def stop(iab_node: IabNode):
+        iab_node.stop()
+        print("Iab node {} stopped".format(iab_node.id))
+
+    @staticmethod
+    def set_parent(iab_node: IabNode, parent):
+        print("Setting IAB node {} parent as {}".format(iab_node.id, parent.id))
+        iab_node.set_parent(parent)
+
+
+class NetTestActions:
+
+    @staticmethod
+    def test_connectivity(src, dst):
+        print("Connectivity test between {} {} and {} {}...".format(
+            src.__class__.__name__,
+            src.id,
+            dst.__class__.__name__,
+            dst.id,
+        ))
+        if NetTests.connectivity_test(src,dst):
+            print("Successful")
+            return True
+        else:
+            print("Failed")
+            return False

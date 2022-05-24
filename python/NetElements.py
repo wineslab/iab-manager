@@ -1,7 +1,8 @@
 from __future__ import annotations
 from python.SRN import Srn
 from typing import List
-from python.ShCommands import ShCommands
+from python.ShStringUtils import ShCommands, NetIdentities
+from python.NetRoles import NetRoles
 
 
 class IabNet:
@@ -42,6 +43,11 @@ class IabNet:
                 self.snr_list[seq].net_role = role
             else:
                 raise NetRoleMappingFailed
+        # kind of an outlier in this function, we need to set core to donor visibility
+        self.core.srn.add_ip_route(
+            target=self.donor.srn.get_tr0_ip(), nh=self.donor.srn.get_col0_ip())
+        self.donor.srn.add_ip_route(
+            target=self.core.get_tr0_ip(), nh=self.core.srn.get_col0_ip())
 
     @staticmethod
     def __netel_list_tostring(lst: List[NetElem]):
@@ -67,18 +73,21 @@ class IabNet:
 
     def __get_netel_by_id(self, net_id, lst: List[NetElem]):
         for net_el in lst:
-            if net_el.srn.id == net_id:
+            if net_el.id == net_id:
                 return net_el
         raise NetElNotFoundException
 
     def get_mt_by_id(self, nid):
-        return self.__get_netel_by_id(nid, self.mt_list)
+        return self.__get_netel_by_id(int(nid), self.mt_list)
 
     def get_du_by_id(self, nid):
-        return self.__get_netel_by_id(nid, self.du_list)
+        return self.__get_netel_by_id(int(nid), self.du_list)
 
     def get_ue_by_id(self, nid):
-        return self.__get_netel_by_id(nid, self.ue_list)
+        return self.__get_netel_by_id(int(nid), self.ue_list)
+
+    def get_iab_by_id(self, iid):
+        return self.__get_netel_by_id(iid, self.iab_list)
 
     def add_iab_node(self, mt, du):
         if mt.iab_node is None and du.iab_node is None:
@@ -90,6 +99,35 @@ class IabNet:
         else:
             return False
 
+    def del_iab_node(self, iab_n: IabNode):
+        iab_n.stop()
+        iab_n.du.iab_node = None
+        iab_n.mt.iab_node = None
+        self.iab_list.remove(iab_n)
+
+    def start_rf_scenario(self, s_id):
+        self.core.srn.run_command(ShCommands.start_rf_scenario(s_id))
+
+    def stop_rf_scenario(self):
+        self.core.srn.run_command(ShCommands.STOP_RF_SCENARIO)
+
+    def update_routes(self):
+        # this function iteratively updates routes
+        queue = []
+        queue.extend(self.donor.children_list)
+
+        while len(queue) > 0:
+            node = queue.pop(0)
+            if isinstance(node, IabNode):
+                # first append children to queue
+                queue.extend(node.children_list)
+                # in mt, route to oai-net through mt's tun
+                node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
+                                         nh=node.mt.get_tun_ep())
+                # in spgwu, route to du through mt's tun ip
+                self.core.add_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip(),
+                                                nh=node.mt.get_tun_ep())
+
 
 class NetElem:
     srn: Srn
@@ -99,6 +137,7 @@ class NetElem:
 
     def __init__(self, srn, **kwargs):
         self.srn = srn
+        self.id = srn.id
 
     def set_commands(self, **kwargs):
         self.stop_cmd = kwargs.get('stop_cmd')
@@ -142,6 +181,8 @@ class NetElem:
                 return res.stdout.strip()
         return False
 
+    def check_softmodem_ready(self):
+        return self.srn.run_command(ShCommands.CHECK_UE_READY)
 
 class Du(NetElem):
     start_cmd = ShCommands.START_DU_TMUX
@@ -218,7 +259,16 @@ class Core(NetElem):
             return res.stdout.strip() == '6'
 
     def start(self):
-        return self.srn.run_command_no_hide(self.start_cmd)
+        res = self.srn.run_command_no_hide(self.start_cmd)
+        return (res and self.srn.add_ip_route(target=NetIdentities.BROAD_TR_NET,
+                                              nh=NetIdentities.SPGWU))
+
+    def add_ip_route_in_spgwu(self, target, nh):
+        res = self.srn.run_command(
+            ShCommands.DOCKER_EXEC_COMMAND_SPGWU.format(ShCommands.add_ip_route(target,nh)))
+        if res:
+            return True
+        return False
 
 
 class IabNode:
@@ -239,9 +289,43 @@ class IabNode:
     def del_child(self, child):
         self.children_list.remove(child)
 
+    def start(self):
+        if self.mt is not None and self.du is not None:
+            rt = True
+            if not self.mt.status():
+                rt = self.mt.start()
+            if not self.du.status():
+                rt = rt and self.du.start()
+            return rt and self.set_internal_route()
+        else:
+            return False
+
+    def set_internal_route(self):
+        # in mt, route to du tr0 iface
+        rt = self.mt.srn.add_ip_route(
+            target=self.du.srn.get_tr0_ip(), nh=self.du.srn.get_col0_ip())
+
+        # in du, route to core through mt col0
+        rt = rt and self.du.srn.add_ip_route(
+            target=NetIdentities.DOCKER_NET, nh=self.mt.srn.get_col0_ip()
+        )
+
+    def stop(self):
+        # stopping is easier, since the stop bash command can be safely sent even if the softmodem is not running
+        if self.mt is not None:
+            self.mt.stop()
+        if self.du is not None:
+            self.du.stop()
+
     def tostring(self):
         st = "IAB Node id {} - Mt id {} - Du id {}".format(self.id, self.mt.srn.id, self.du.srn.id)
+        if self.parent is not None:
+            st = st + ' - Parent {}'.format(self.parent.id)
         return st
+
+    def get_tun_ep(self):
+        return self.mt.srn.get_tun_ep()
+
 
 class Donor(NetElem):
     start_cmd = ShCommands.START_DONOR_TMUX
@@ -257,13 +341,6 @@ class Donor(NetElem):
         res = super().status()
         if res:
             return int(res.stdout.strip()) >= 1
-
-class NetRoles:
-    CORE = 0
-    DU = 1
-    MT = 2
-    UE = 3
-    DONOR = 4
 
 
 class NodeRoleSequences:

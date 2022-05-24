@@ -6,12 +6,12 @@ with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category=CryptographyDeprecationWarning)
     import fabric
 
-from python.NetElements import NetRoles
+from python.NetRoles import NetRoles
 import string
 
 from invoke import exceptions as invoke_exc
 
-from python.ShCommands import ShCommands
+from python.ShStringUtils import ShCommands
 
 
 class Srn:
@@ -21,6 +21,7 @@ class Srn:
     conn_gw: fabric.Connection
     hostname: str
     col0_ip: str
+    tr0_ip: str
     is_manager_host: bool
 
     def __init__(self, *args, **kwargs):
@@ -92,6 +93,37 @@ class Srn:
     def push_srn_type(self, s_type: str):
         self.run_command(ShCommands.PUSH_SRN_TYPE.format(s_type))
 
+    def get_tun_ep(self):
+        if self.iface_exists('oaitun_ue1'):
+            res = self.run_command(ShCommands.GET_IFACE_IP.format('oaitun_ue1'))
+            if res:
+                return res.stdout.strip()
+        return False
+
+    def get_tr0_ip(self):
+        if self.iface_exists('tr0'):
+            res = self.run_command(ShCommands.GET_IFACE_IP.format('tr0'))
+            if res:
+                return res.stdout.strip()
+        return False
+
+    def iface_exists(self, iface: str):
+        res = self.run_command(ShCommands.CHECK_IFACE_EXISTS.format(iface))
+        if res:
+            return res.exited == 0
+
+    def add_ip_route(self, target, nh):
+        res = self.run_command(ShCommands.add_ip_route(target, nh))
+        if not res:
+            return False
+        return True
+
+    def get_col0_ip(self):
+        if self.iface_exists('col0'):
+            res = self.run_command(ShCommands.GET_IFACE_IP.format('col0'))
+            if res:
+                return res.stdout.strip()
+        return False
 
 class SrnTypes:
     CORE = 0
