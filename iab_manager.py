@@ -116,7 +116,8 @@ def manager_init():
 
 if __name__ == '__main__':
     iab_net = manager_init()
-    PromptWorker(iab_net).do_iab_node("add 5 4")
-    PromptWorker(iab_net).do_iab_node("set 45 parent donor")
-    PromptWorker(iab_net).do_iab_node("start 45")
+    #PromptWorker(iab_net).do_iab_node("add 5 4")
+    #PromptWorker(iab_net).do_iab_node("set 45 parent donor")
+    #PromptWorker(iab_net).do_iab_node("start 45")
+    PromptWorker(iab_net).do_test('tp down core donor')
     PromptWorker(iab_net).cmdloop()

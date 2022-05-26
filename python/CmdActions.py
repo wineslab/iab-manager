@@ -1,5 +1,6 @@
 from python.NetElements import IabNet, Mt, Ue, Du, IabNode
 import python.NetTests as NetTests
+from python.TaskManager import TaskManager
 
 
 class CoreActions:
@@ -158,7 +159,7 @@ class IabNodeActions:
         iab_net.del_iab_node(iab_node)
 
     @staticmethod
-    def start(iab_node: IabNode):
+    def start(iab_node: IabNode, iab_net: IabNet):
         if iab_node.parent is None:
             print("IAB node {} does not have a parent".format(iab_node.id))
             return
@@ -177,9 +178,12 @@ class IabNodeActions:
         else:
             print("MT {} failed, aborting...")
             return
-        DuActions.start(iab_node.du)
+        print('Adding core routes')
+        iab_net.update_iabnode_route(iab_node)
+        print('Restarting DU..')
+        iab_node.du.stop()
+        iab_node.du.start()
         print("Iab node {} started".format(iab_node.id))
-
 
     @staticmethod
     def stop(iab_node: IabNode):
@@ -202,9 +206,22 @@ class NetTestActions:
             dst.__class__.__name__,
             dst.id,
         ))
-        if NetTests.connectivity_test(src,dst):
+        if NetTests.connectivity_test(src, dst):
             print("Successful")
             return True
         else:
             print("Failed")
             return False
+
+    @staticmethod
+    def test_tp(src, dst):
+        print("Throughput test between {} {} and {} {}...".format(
+            src.__class__.__name__,
+            src.id,
+            dst.__class__.__name__,
+            dst.id,
+        ))
+        #prom = NetTests.tp_test_task(src, dst, verbose=True, reverse=False, asynchronous=True)
+        kwargs = {'src': src, 'dest': dst, 'verbose': True, 'reverse': False, 'asynchronous': True}
+        TaskManager.launch_task_thread(NetTests.tp_test_task, kwargs=kwargs)
+        # TaskManager.launch_task(print, ('ciao',))

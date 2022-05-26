@@ -17,7 +17,12 @@ class ShCommands:
     STOP_RF_SCENARIO = 'colosseumcli rf stop'
     CHECK_UE_READY = './check_ue_ready.sh'
     ADD_IP_ROUTE = 'ip route add {} via {}'
+    DEL_IP_ROUTE = 'ip route del {}'
     DOCKER_EXEC_COMMAND_SPGWU = 'docker exec oai-spgwu \'{}\''
+    START_IPERF3_SERVER_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3server 'iperf3 -s --bind {} --json'"
+    START_IPERF3_CLIENT_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3client 'iperf3 -c {} --bind {} {} " \
+                               r"{}' "
+    START_IPERF3_CLIENT = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; iperf3 -c {} --bind {} {} {} --json"
 
     @staticmethod
     def single_ping(bind_ip, dst_ip):
@@ -30,6 +35,31 @@ class ShCommands:
     @staticmethod
     def add_ip_route(target, nh):
         return ShCommands.ADD_IP_ROUTE.format(target, nh)
+
+    @staticmethod
+    def del_ip_route(target):
+        return ShCommands.DEL_IP_ROUTE.format(target)
+
+    @staticmethod
+    def start_iperf3_server(bind_addr):
+        return ShCommands.START_IPERF3_SERVER_TMUX.format(bind_addr)
+
+    @staticmethod
+    def start_iperf3_client(use_tmux, server, bind_addr, proto_bw, args):
+        if use_tmux:
+            return ShCommands.START_IPERF3_CLIENT_TMUX.format(
+                server,
+                bind_addr,
+                proto_bw,
+                args,
+            )
+        else:
+            return ShCommands.START_IPERF3_CLIENT.format(
+                server,
+                bind_addr,
+                proto_bw,
+                args,
+            )
 
 
 class NetIdentities:

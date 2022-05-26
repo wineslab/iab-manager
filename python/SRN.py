@@ -63,6 +63,9 @@ class Srn:
     def run_command_no_hide(self, command: string):
         return self.__run_command(command)
 
+    def run_command_asynch(self, command: string):
+        return self.__run_command(command, asynchronous=True, warn=False)
+
     def __run_command(self, command: string, **kwargs):
         if not self.connected:
             self.connect()
@@ -118,6 +121,12 @@ class Srn:
             return False
         return True
 
+    def del_ip_route(self, target):
+        res = self.run_command(ShCommands.del_ip_route(target))
+        if not res:
+            return False
+        return True
+
     def get_col0_ip(self):
         if self.iface_exists('col0'):
             res = self.run_command(ShCommands.GET_IFACE_IP.format('col0'))
@@ -125,6 +134,75 @@ class Srn:
                 return res.stdout.strip()
         return False
 
+    def start_iperf_server(self, bind_addr):
+        res = self.run_command(ShCommands.start_iperf3_server(bind_addr))
+        if res:
+            return res
+        else:
+            return False
+
+    def start_iperf_server_iface(self, bind_iface):
+        if self.iface_exists(bind_iface):
+            res = self.run_command(ShCommands.GET_IFACE_IP.format(bind_iface))
+            if res:
+                bind_addr = res.stdout.strip()
+                return self.start_iperf_server(bind_addr)
+            else:
+                return False
+        else:
+            return False
+
+    def start_iperf_client(self, use_tmux, server_addr, bind_addr, **kwargs):
+        proto = kwargs.get('proto', 'udp')
+        bw = kwargs.get('bw', 1)  # Mbps
+        rev = kwargs.get('reverse', False)
+        asynchronous = kwargs.get('asynchronous', False)
+        # log_file = kwargs.get('log_file', 'last_iperf_log')
+        match proto:
+            case 'udp':
+                proto = '-u'
+            case _:
+                proto = ''
+        if rev:
+            rev = '-R'
+        else:
+            rev = ''
+        cmd = ShCommands.start_iperf3_client(
+            use_tmux=use_tmux,
+            server=server_addr,
+            bind_addr=bind_addr,
+            proto_bw=proto+' -b '+str(bw)+'M',
+            args=rev
+        )
+        if asynchronous:
+            return self.run_command_asynch(cmd)
+        else:
+            res = self.run_command(cmd)
+        if res:
+            return res
+        else:
+            return False
+
+    def start_iperf_client_iface(self, use_tmux, server_addr, bind_iface, **kwargs):
+        if self.iface_exists(bind_iface):
+            res = self.run_command(ShCommands.GET_IFACE_IP.format(bind_iface))
+            if res:
+                bind_addr = res.stdout.strip()
+                return self.start_iperf_client(use_tmux, server_addr, bind_addr, **kwargs)
+            else:
+                return False
+        else:
+            return False
+
+
 class SrnTypes:
     CORE = 0
     RAN = 1
+
+
+class SrnIfaces:
+    COL = 'col0'
+    TR = 'tr0'
+    TUN = 'tun0'
+    UE_TUN = 'oaitun_ue1'
+    DOCKER_NET = 'demo-oai'

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from python.SRN import Srn
+from python.SRN import Srn, SrnIfaces
 from typing import List
 from python.ShStringUtils import ShCommands, NetIdentities
 from python.NetRoles import NetRoles
@@ -111,8 +111,16 @@ class IabNet:
     def stop_rf_scenario(self):
         self.core.srn.run_command(ShCommands.STOP_RF_SCENARIO)
 
-    def update_routes(self):
-        # this function iteratively updates routes
+    def update_iabnode_route(self, node: IabNode):
+        # in mt, route to oai-net through mt's tun
+        node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
+                                 nh=node.mt.get_tun_ep())
+        # in spgwu, route to du through mt's tun ip - first delete any previous route
+        self.core.del_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip())
+        self.core.add_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip(),
+                                        nh=node.mt.get_tun_ep())
+
+    def update_tree_routes(self):
         queue = []
         queue.extend(self.donor.children_list)
 
@@ -121,12 +129,8 @@ class IabNet:
             if isinstance(node, IabNode):
                 # first append children to queue
                 queue.extend(node.children_list)
-                # in mt, route to oai-net through mt's tun
-                node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
-                                         nh=node.mt.get_tun_ep())
-                # in spgwu, route to du through mt's tun ip
-                self.core.add_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip(),
-                                                nh=node.mt.get_tun_ep())
+                self.update_iabnode_route(node)
+
 
 
 class NetElem:
@@ -134,6 +138,7 @@ class NetElem:
     start_cmd: str
     stop_cmd: str
     status_cmd: str
+    iperf_bind_iface: str
 
     def __init__(self, srn, **kwargs):
         self.srn = srn
@@ -182,13 +187,21 @@ class NetElem:
         return False
 
     def check_softmodem_ready(self):
-        return self.srn.run_command(ShCommands.CHECK_UE_READY)
+        return self.srn.run_command_disown(ShCommands.CHECK_UE_READY)
+
+    def start_iperf_server(self):
+        return self.srn.start_iperf_server_iface(self.iperf_bind_iface)
+
+    def start_iperf_client(self, use_tmux, server_addr, **kwargs):
+        return self.srn.start_iperf_client_iface(use_tmux, server_addr, self.iperf_bind_iface, **kwargs)
+
 
 class Du(NetElem):
     start_cmd = ShCommands.START_DU_TMUX
     stop_cmd = ShCommands.STOP_SOFTMODEM
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
     iab_node: IabNode = None
+    iperf_bind_iface = SrnIfaces.TR
 
     def __init__(self, srn):
         super().__init__(srn)
@@ -212,6 +225,7 @@ class Mt(NetElem):
     stop_cmd = ShCommands.STOP_SOFTMODEM
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
     iab_node = None
+    iperf_bind_iface = SrnIfaces.UE_TUN
 
     def __init__(self, srn):
         self.du = None
@@ -234,6 +248,7 @@ class Ue(NetElem):
     start_cmd = ShCommands.START_UE_TMUX
     stop_cmd = ShCommands.STOP_SOFTMODEM
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+    iperf_bind_iface = SrnIfaces.UE_TUN
 
     def __init__(self, srn):
         self.associated_bs = None
@@ -249,6 +264,7 @@ class Core(NetElem):
     start_cmd = ShCommands.START_CORE
     stop_cmd = ShCommands.STOP_CORE
     status_cmd = ShCommands.CORE_STATUS_WCL
+    iperf_bind_iface = SrnIfaces.DOCKER_NET
 
     def __int__(self, srn):
         super().__init__(srn)
@@ -270,15 +286,25 @@ class Core(NetElem):
             return True
         return False
 
+    def del_ip_route_in_spgwu(self, target):
+        res = self.srn.run_command(
+            ShCommands.DOCKER_EXEC_COMMAND_SPGWU.format(ShCommands.del_ip_route(target)))
+        if res:
+            return True
+        return False
+
+
 
 class IabNode:
     parent: IabNode = None  # or donor
     children_list: List[IabNode]
+    srn: Srn  # needed to reuse functions written for NetElem without inheriting NetElem itself
 
     def __init__(self, du: Du, mt: Mt):
         self.du = du
         self.mt = mt
         self.id = str(mt.srn.id) + str(du.srn.id)
+        self.srn = du.srn  # this is done by choice, it could be mt as well
 
     def set_parent(self, parent):
         self.parent = parent
@@ -310,6 +336,7 @@ class IabNode:
             target=NetIdentities.DOCKER_NET, nh=self.mt.srn.get_col0_ip()
         )
 
+
     def stop(self):
         # stopping is easier, since the stop bash command can be safely sent even if the softmodem is not running
         if self.mt is not None:
@@ -331,6 +358,7 @@ class Donor(NetElem):
     start_cmd = ShCommands.START_DONOR_TMUX
     stop_cmd = ShCommands.STOP_SOFTMODEM
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+    iperf_bind_iface = SrnIfaces.TR
 
     children_list: List[IabNode]
 

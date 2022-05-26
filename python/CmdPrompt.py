@@ -241,7 +241,6 @@ class PromptWorker(cmd.Cmd):
             case 'stop':
                 self.iab_net.stop_rf_scenario()
 
-
     def do_test(self, args: str):
         # args example: connectivity down core donor
         # args example: connectivity down core mt 1
@@ -380,7 +379,7 @@ class PromptWorker(cmd.Cmd):
             case 'latency':
                 pass
             case 'tp':
-                pass
+                NetTestActions.test_tp(src,dst)
             case _:
                 print(usage_str)
                 return
