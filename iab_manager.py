@@ -76,7 +76,7 @@ def manager_init():
             raise Exception('Gateway connection failed')
 
         # parse srn from json, add gateway and test
-        srn_list = parse_snr_from_reservation('reservations_data/reservation_126023.json')
+        srn_list = parse_snr_from_reservation('reservations_data/reservation_126148.json')
         print('Testing srn connections...')
         for s_i, srn in enumerate(srn_list):
             # print(s_i)
@@ -119,5 +119,5 @@ if __name__ == '__main__':
     #PromptWorker(iab_net).do_iab_node("add 5 4")
     #PromptWorker(iab_net).do_iab_node("set 45 parent donor")
     #PromptWorker(iab_net).do_iab_node("start 45")
-    PromptWorker(iab_net).do_test('tp down core donor')
+    #PromptWorker(iab_net).do_test('tp down core donor')
     PromptWorker(iab_net).cmdloop()

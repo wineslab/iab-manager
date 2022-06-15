@@ -254,7 +254,10 @@ class PromptWorker(cmd.Cmd):
         if len(args) < 4:
             print(usage_str)
             return
-
+        if args[-1] == '&':
+            run_asynch = True
+        else:
+            run_asynch = False
         # get source and dest
         dst_arg_offset = 0
         match args[2]:  # match on source descriptor
@@ -379,7 +382,7 @@ class PromptWorker(cmd.Cmd):
             case 'latency':
                 pass
             case 'tp':
-                NetTestActions.test_tp(src,dst)
+                NetTestActions.test_tp(src, dst, run_asynch)
             case _:
                 print(usage_str)
                 return

@@ -214,14 +214,17 @@ class NetTestActions:
             return False
 
     @staticmethod
-    def test_tp(src, dst):
-        print("Throughput test between {} {} and {} {}...".format(
+    def test_tp(src, dst, run_asynch):
+        print("Throughput test between {} {} and {} {} started".format(
             src.__class__.__name__,
             src.id,
             dst.__class__.__name__,
             dst.id,
         ))
-        #prom = NetTests.tp_test_task(src, dst, verbose=True, reverse=False, asynchronous=True)
-        kwargs = {'src': src, 'dest': dst, 'verbose': True, 'reverse': False, 'asynchronous': True}
-        TaskManager.launch_task_thread(NetTests.tp_test_task, kwargs=kwargs)
+        if run_asynch:
+            kwargs = {'src': src, 'dest': dst, 'verbose': False, 'reverse': False, 'asynchronous': True}
+            TaskManager.launch_task_thread(NetTests.tp_test_task, kwargs=kwargs)
+        else:
+            kwargs = {'src': src, 'dest': dst, 'verbose': False, 'reverse': False, 'asynchronous': True}
+            NetTests.tp_test_task(kwargs)
         # TaskManager.launch_task(print, ('ciao',))
