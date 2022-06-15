@@ -1,5 +1,5 @@
 # iab-manager
-___
+
 `iab-manager` is a WIP command-line tool for the creation, management, reconfiguration and testing of IAB networks based on Openair Interface and reproduced on Colosseum. 
 
 The tool is mainly written in Python and can be executed either on a remote machine or any of the reserved SRNs.
@@ -8,7 +8,6 @@ The tool is mainly written in Python and can be executed either on a remote mach
 A modified version of OAI's packet gateway is included as a git submodule. This version allows framed routing, which is required to forward traffic through GTP-tunnels when the destionation IP is different from the endpoint IP. This is currently achieved through cached kernel lookups. TODO: synchronize cache clearing with kernel routing tables changes. 
 
 ## Usage
-___
 
 ### Entrypoint
 The user should provide the entrypoint SRN hostname. Colosseum's SSH gateway `colosseum-gw` will be employed. The manager can run directly on a SRN, in that case the entrypoint is not required. 
