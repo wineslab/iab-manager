@@ -1,6 +1,0 @@
-[submodule "openair-spgwu-tiny"]
-	path = openair-spgwu-tiny
-	url = https://github.com/EugenioMoro/openair-spgwu-tiny.git
-[submodule "openairinterface5g"]
-	path = openairinterface5g
-	url = https://github.com/EugenioMoro/openairinterface5g.git
