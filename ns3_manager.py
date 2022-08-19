@@ -22,20 +22,17 @@ def main():
     # Parse data #
     #######################
     parser = argparse.ArgumentParser(description="Provide Colosseum username and path to JSON reservation")
+    parser.add_argument('reservation_path', type=str, help='Path to JSON reservation')
     parser.add_argument('user', type=str, nargs='?', help='Colosseum username that needs to access to the SRNs')
-    parser.add_argument('reservation_path', type=int, nargs='?', help='Path to JSON reservation')
 
     args = parser.parse_args()
+
+    reservation_path = args.reservation_path
 
     if args.user:
         user = args.user
     else:
         user = 'alacava'
-
-    if args.reservation_path:
-        reservation_path = args.reservation_path
-    else:
-        reservation_path = 'C:\\Users\\Andrea\\Downloads\\reservation_127988.json'
 
     print(f"Username: {user}")
     print(f"Reservation path: {reservation_path}")
@@ -54,7 +51,7 @@ def main():
     for s_i, srn in enumerate(srn_list):
         print(f'[{s_i}] Starting SRN... ', end='')
         srn.conn_gw = gw_conn
-        start_sem_command = "tmux new-session -d 'cd oran-campaign; ./launch_sims.sh ; bash -i'"  # this must be changed
+        start_sem_command = "tmux new-session -d 'cd oran-campaign; ./launch_sims_qos.sh ; bash -i'"
         res = srn.run_command(start_sem_command)
         if res:
             print("Done")
