@@ -19,6 +19,12 @@ from python.CmdPrompt import PromptWorker
 from fabric import Connection
 import json
 import sys
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+COLOSSEUM_USER = os.getenv('COLOSSEUM_USER')
 
 
 def parse_snr_from_reservation(filepath: str):
@@ -71,7 +77,7 @@ def manager_init():
 
         # create and test gateway connection
         print("Initializing gateway connection...")
-        gw_conn = Connection(host='colosseum-gw', user='eugeniomoro')
+        gw_conn = Connection(host='colosseum-gw', user=COLOSSEUM_USER)
         if gw_conn.run('uname', hide=True, warn=False).failed:
             raise Exception('Gateway connection failed')
 
@@ -90,7 +96,6 @@ def manager_init():
             # srn.connection.run('chmod +x run_ue.sh', hide=True)
             # assert srn.test_ssh_conn()
             # print('Testing srn connections... ' + str(round((s_i/len(srn_list))*100)) + 'done', end='\r')
-
 
     # gw_conn = Connection(host='colosseum-gw', user='eugeniomoro')
     # ep_conn = Connection(host='wineslab-001', user='root', gateway=gw_conn, connect_kwargs={"password": "pass"})

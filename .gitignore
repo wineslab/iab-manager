@@ -8,3 +8,4 @@ venv/
 reservations_data/
 
 iperf_results/
+.env
