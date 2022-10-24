@@ -176,7 +176,7 @@ class IabNodeActions:
         if iab_node.mt.check_softmodem_ready():
             print("MT {} is ready".format(iab_node.mt.id))
         else:
-            print("MT {} failed, aborting...")
+            print("MT {} failed, aborting...".format(iab_node.mt.id))
             return
         print('Adding core routes')
         iab_net.update_iabnode_route(iab_node)

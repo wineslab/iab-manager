@@ -185,7 +185,7 @@ class PromptWorker(cmd.Cmd):
                 except NetElNotFoundException:
                     print("IAB node {} not found".format(args[1]))
                     return
-                IabNodeActions.start(iab_n)
+                IabNodeActions.start(iab_n, iab_net=self.iab_net)
             case 'stop':
                 if len(args) != 2:
                     print(usage_str)
@@ -211,7 +211,7 @@ class PromptWorker(cmd.Cmd):
                             case 'donor':
                                 IabNodeActions.set_parent(iab_n, self.iab_net.donor)
                             case 'node':
-                                if len(args) != 4:
+                                if len(args) != 5:
                                     print(usage_str)
                                     return
                                 try:
@@ -323,7 +323,7 @@ class PromptWorker(cmd.Cmd):
                 dst = self.iab_net.donor
 
             case 'iab_node':
-                if len(args) < 6 - (1-dst_arg_offset):
+                if len(args) < 4 - (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
@@ -333,7 +333,7 @@ class PromptWorker(cmd.Cmd):
                     return
 
             case 'mt':
-                if len(args) < 6 - (1-dst_arg_offset):
+                if len(args) < 4 - (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
@@ -343,7 +343,7 @@ class PromptWorker(cmd.Cmd):
                     return
 
             case 'du':
-                if len(args) < 6 + (1-dst_arg_offset):
+                if len(args) < 4 + (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
@@ -353,7 +353,7 @@ class PromptWorker(cmd.Cmd):
                     return
 
             case 'ue':
-                if len(args) < 6 - (1-dst_arg_offset):
+                if len(args) < 4 - (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
