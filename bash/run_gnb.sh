@@ -46,4 +46,4 @@ cd openairinterface5g/
 source oaienv
 cd cmake_targets/ran_build/build/
 
-numactl --cpunodebind=netdev:usrp0 --membind=netdev:usrp0  ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --sa -E --usrp-tx-thread-config 1 2>&1 | tee ../../../../mylogs/GNB-$(date +"%m%d%H%M").log
+numactl --cpunodebind=netdev:usrp0 --membind=netdev:usrp0  ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --sa --continuous-tx -E --usrp-tx-thread-config 1 2>&1 | tee ../../../../mylogs/GNB-$(date +"%m%d%H%M").log
