@@ -112,9 +112,14 @@ class IabNet:
         self.core.srn.run_command(ShCommands.STOP_RF_SCENARIO)
 
     def update_iabnode_route(self, node: IabNode):
-        # in mt, route to oai-net through mt's tun
+        # in mt, route to oai-net through mt's tun, first delete any
+        node.mt.srn.run_command(
+            ShCommands.del_ip_route(NetIdentities.DOCKER_NET))
         node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
                                  nh=node.mt.get_tun_ep())
+        # in du, route through mt col0
+        #node.du.srn.add_ip_route(target=NetIdentities.DOCKER_NET, nh=node.mt.get)
+        node.set_internal_route()
         # in spgwu, route to du through mt's tun ip - first delete any previous route
         self.core.del_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip())
         self.core.add_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip(),
