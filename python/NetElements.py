@@ -192,7 +192,7 @@ class NetElem:
         return False
 
     def check_softmodem_ready(self):
-        return self.srn.run_command_disown(ShCommands.CHECK_UE_READY)
+        return self.srn.run_command_no_hide(ShCommands.CHECK_UE_READY)
 
     def start_iperf_server(self):
         return self.srn.start_iperf_server_iface(self.iperf_bind_iface)
