@@ -1,7 +1,7 @@
 from __future__ import annotations
 from python.SRN import Srn
 from python.NetElements import NetElem, Mt, Du, Ue, Donor, Core, IabNode
-from python.ShStringUtils import ShCommands
+from python.ShStringUtils import ShCommands, NetIdentities
 from json import loads as json_parse
 from types import SimpleNamespace
 from time import strftime
@@ -78,12 +78,16 @@ def __extract_src_dst_addr(src: NetElem, dest: NetElem):
     elif isinstance(src, Donor):
         src_ip = src.get_tr0_ip()
     elif isinstance(src, Core):
-        src_ip = src.get_tr0_ip()
+        #src_ip = src.get_tr0_ip()
+        src_ip = NetIdentities.CORE_DOCKER_IP
     elif isinstance(src, IabNode):
         src_ip = src.du.srn.get_tr0_ip()
 
     if isinstance(dest, Mt):
-        dst_ip = dest.get_tr0_ip()
+        if isinstance(src, Core):
+            dst_ip = dest.get_tun_ep()
+        else:
+            dst_ip = dest.get_tr0_ip()
     elif isinstance(dest, Du):
         dst_ip = dest.get_tr0_ip()
     elif isinstance(dest, Ue):
@@ -91,7 +95,8 @@ def __extract_src_dst_addr(src: NetElem, dest: NetElem):
     elif isinstance(dest, Donor):
         dst_ip = dest.get_tr0_ip()
     elif isinstance(dest, Core):
-        dst_ip = dest.get_tr0_ip()
+        #dst_ip = dest.get_tr0_ip()
+        dst_ip = NetIdentities.CORE_DOCKER_IP
     elif isinstance(dest, IabNode):
         dst_ip = dest.du.srn.get_tr0_ip()
 

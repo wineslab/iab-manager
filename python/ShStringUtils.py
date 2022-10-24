@@ -68,3 +68,4 @@ class NetIdentities:
     TUN_NET = '12.1.1.0/24'
     SPGWU_TUN_EP = '12.1.1.1'
     BROAD_TR_NET = '192.168.0.0/16'
+    CORE_DOCKER_IP = '192.168.70.129'
