@@ -398,6 +398,39 @@ class NodeRoleSequences:
         NetRoles.MT,
     ]
 
+    SCENARIO_1_SEQUENCE = [
+        NetRoles.CORE,
+        NetRoles.DONOR,
+        NetRoles.MT,
+        NetRoles.DU,
+        NetRoles.MT,
+        NetRoles.DU,
+        NetRoles.MT,
+        NetRoles.DU,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE
+    ]
+    SCENARIO_2_SEQUENCE = [
+        NetRoles.CORE,
+        NetRoles.DONOR,
+        NetRoles.MT,
+        NetRoles.DU,
+        NetRoles.MT,
+        NetRoles.DU,
+        NetRoles.MT,
+        NetRoles.DU,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE,
+        NetRoles.UE
+    ]
+
 
 class NetElNotFoundException(Exception):
     pass
