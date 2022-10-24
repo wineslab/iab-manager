@@ -2,7 +2,7 @@ class ShCommands:
     UNAME = 'uname'
     CAT_SNR_TYPE = 'cat /snr_type'
     PUSH_SRN_TYPE = "echo \'{}\' > /srn_type"
-    START_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh start nrf spgwu'
+    START_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh start nrf spgwu && ip route add 12.1.1.0/24 via 192.168.70.134'
     STOP_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh stop nrf spgwu'
     CORE_STATUS_WCL = 'docker ps | wc -l'
     SOFTMODEM_STATUS_WCL = 'pgrep softmodem | wc -l'
@@ -18,7 +18,7 @@ class ShCommands:
     CHECK_UE_READY = './check_ue_ready.sh'
     ADD_IP_ROUTE = 'ip route add {} via {}'
     DEL_IP_ROUTE = 'ip route del {}'
-    DOCKER_EXEC_COMMAND_SPGWU = 'docker exec oai-spgwu \'{}\''
+    DOCKER_EXEC_COMMAND_SPGWU = 'docker exec oai-spgwu {}'
     START_IPERF3_SERVER_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3server 'iperf3 -s --bind {} --json'"
     START_IPERF3_CLIENT_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3client 'iperf3 -c {} --bind {} {} " \
                                r"{}' "
