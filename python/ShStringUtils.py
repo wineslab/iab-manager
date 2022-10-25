@@ -6,10 +6,10 @@ class ShCommands:
     STOP_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh stop nrf spgwu'
     CORE_STATUS_WCL = 'docker ps | wc -l'
     SOFTMODEM_STATUS_WCL = 'pgrep softmodem | wc -l'
-    START_UE_TMUX = 'tmux new-session -d -s ue_softmodem \'/root/run_ue.sh\''
+    START_UE_TMUX = 'tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -p 106 -c 0 -t ue\''
     STOP_SOFTMODEM = 'kill $(pgrep softmodem)'
-    START_DONOR_TMUX = 'tmux new-session -d -s ue_softmodem \'/root/run_gnb.sh -t donor\''
-    START_DU_TMUX = 'tmux new-session -d -s ue_softmodem \'/root/run_gnb.sh -t iab\''
+    START_DONOR_TMUX = 'tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -p 106 -c 0 -t donor\''
+    START_DU_TMUX = 'tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -p 106 -c 0 -t iab\''
     CHECK_IFACE_EXISTS = 'ifconfig | grep {}'
     GET_IFACE_IP = r"ip -f inet addr show {} | sed -En -e 's/.*inet ([0-9.]+).*/\1/p'"
     SINGLE_PING = 'ping -c 1 -I {} {}'

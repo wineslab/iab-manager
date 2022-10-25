@@ -36,6 +36,9 @@ class Srn:
         self.type = None
         self.connected = False
 
+    def __repr__(self):
+        return self.hostname
+
     def connect(self):
         if self.is_manager_host:
             # dummy local connection

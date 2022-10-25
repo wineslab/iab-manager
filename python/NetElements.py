@@ -24,10 +24,11 @@ class IabNet:
 
     def apply_roles(self, node_role_sequence):
         # check if enough snr
-        if len(node_role_sequence) != len(self.snr_list):
-            raise NetRoleMappingFailed("Role sequence list longer than available snrs")
+        if len(node_role_sequence) > len(self.snr_list):
+            raise NetRoleMappingFailed(f"Role sequence list {len(node_role_sequence)} longer than available snrs {len(self.snr_list)}")
         for seq, role in enumerate(node_role_sequence):
             # check if snr supports role
+            print(self.snr_list[seq].hostname, role)
             if self.snr_list[seq].supports_role(role):
                 # role is supported, so create new NetElem accordingly
                 match role:
@@ -112,14 +113,9 @@ class IabNet:
         self.core.srn.run_command(ShCommands.STOP_RF_SCENARIO)
 
     def update_iabnode_route(self, node: IabNode):
-        # in mt, route to oai-net through mt's tun, first delete any
-        node.mt.srn.run_command(
-            ShCommands.del_ip_route(NetIdentities.DOCKER_NET))
+        # in mt, route to oai-net through mt's tun
         node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
                                  nh=node.mt.get_tun_ep())
-        # in du, route through mt col0
-        #node.du.srn.add_ip_route(target=NetIdentities.DOCKER_NET, nh=node.mt.get)
-        node.set_internal_route()
         # in spgwu, route to du through mt's tun ip - first delete any previous route
         self.core.del_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip())
         self.core.add_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip(),
@@ -135,7 +131,6 @@ class IabNet:
                 # first append children to queue
                 queue.extend(node.children_list)
                 self.update_iabnode_route(node)
-
 
 
 class NetElem:
@@ -286,7 +281,7 @@ class Core(NetElem):
 
     def add_ip_route_in_spgwu(self, target, nh):
         res = self.srn.run_command(
-            ShCommands.DOCKER_EXEC_COMMAND_SPGWU.format(ShCommands.add_ip_route(target,nh)))
+            ShCommands.DOCKER_EXEC_COMMAND_SPGWU.format(ShCommands.add_ip_route(target, nh)))
         if res:
             return True
         return False
@@ -297,7 +292,6 @@ class Core(NetElem):
         if res:
             return True
         return False
-
 
 
 class IabNode:
@@ -341,7 +335,6 @@ class IabNode:
             target=NetIdentities.DOCKER_NET, nh=self.mt.srn.get_col0_ip()
         )
 
-
     def stop(self):
         # stopping is easier, since the stop bash command can be safely sent even if the softmodem is not running
         if self.mt is not None:
@@ -377,7 +370,7 @@ class Donor(NetElem):
 
 
 class NodeRoleSequences:
-    DEFAULT_11_SRN_SEQUENCE = [
+    DEFAULT_15_SRN_SEQUENCE = [
         NetRoles.CORE,
         NetRoles.DONOR,
         NetRoles.MT,

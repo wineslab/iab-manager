@@ -1,41 +1,62 @@
 # This is an iab network manager
 
-# import warnings
-# from cryptography.utils import CryptographyDeprecationWarning
-# with warnings.catch_warnings():
-#    warnings.filterwarnings('ignore', category=CryptographyDeprecationWarning)
-#    import fabric
-#    from paramiko import SSHConfig
-# from socket import gethostbyname
-import functools
-
-from promise import Promise
-
 
 from pathlib import Path
 from python.SRN import Srn, SrnTypes
 from python.NetElements import IabNet, NodeRoleSequences
 from python.CmdPrompt import PromptWorker
 from fabric import Connection
-import json
-import sys
 import os
+import requests
 from dotenv import load_dotenv
+import argparse
 
 load_dotenv()
 
 COLOSSEUM_USER = os.getenv('COLOSSEUM_USER')
+COLOSSEUM_PWD = os.getenv('COLOSSEUM_PWD')
 
 
-def parse_snr_from_reservation(filepath: str):
-    with open(filepath) as f:
-        data = json.load(f)
-        snr_list = []
-        for node in data['nodes']:
-            nid = node['srn_id']
-            hn = data['team_name'] + '-' + ('00' if nid <= 9 else '0' if nid <= 99 else '') + str(nid)
-            snr_list.append(Srn(hostname=hn, id=node['srn_id']))
-        return snr_list
+def login_colosseum():
+    json_data = {
+        'username': COLOSSEUM_USER,
+        'password': COLOSSEUM_PWD,
+    }
+    print(json_data)
+    response = requests.post('https://experiments.colosseum.net/api/v1/auth/login/',  json=json_data,  verify=False)
+    if response.status_code != 200:
+        raise Exception("Error logging in")
+    for c in response.cookies:
+        if c.name == 'sessionid':
+            return c.value
+    raise Exception("No cookie found")
+
+
+def get_reservation(session_id, reservation_id):
+    cookies = {
+        'sessionid': session_id,
+    }
+
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+    }
+
+    response = requests.get(f'https://experiments.colosseum.net/api/v1/reservations/{reservation_id}/', cookies=cookies, headers=headers, verify=False)
+    if response.status_code != 200:
+        raise Exception("Error getting reservation")
+    return response.json()
+
+
+def parse_snr_from_reservation(reservation_id: str):
+    session = login_colosseum()
+    data = get_reservation(session, reservation_id)[0]
+    snr_list = []
+    for node in data['nodes']:
+        nid = node['srn_id']
+        hn = data['team_name'] + '-' + ('00' if nid <= 9 else '0' if nid <= 99 else '') + str(nid)
+        snr_list.append(Srn(hostname=hn, id=node['srn_id']))
+    snr_list.sort(key=lambda x: x.id)
+    return snr_list
 
 
 def scan_subnet(entry_point: Connection, col0_prefix: str, **kwargs):
@@ -69,7 +90,7 @@ def get_snr_fromlist(snr_list: list, col0_prefix: str, **kwargs):
     return snr_list
 
 
-def manager_init():
+def manager_init(reservation_id):
 
     local = True if Path("/core_srn").is_file() else False
 
@@ -82,15 +103,15 @@ def manager_init():
             raise Exception('Gateway connection failed')
 
         # parse srn from json, add gateway and test
-        srn_list = parse_snr_from_reservation('reservations_data/reservation_126148.json')
+        srn_list = parse_snr_from_reservation(reservation_id)
         print('Testing srn connections...')
         for s_i, srn in enumerate(srn_list):
-            # print(s_i)
+            #print(s_i, srn.hostname)
             srn.conn_gw = gw_conn
-            # if s_i > 1:
-            #     srn.push_srn_type('ran')
-            # else:
-            #     srn.push_srn_type('core')
+            if s_i > 1:
+                srn.push_srn_type('ran')
+            else:
+                srn.push_srn_type('core')
             srn.stat_srn_type()
             # srn.connection.put(local='bash/run_ue.sh', remote='/root/')
             # srn.connection.run('chmod +x run_ue.sh', hide=True)
@@ -112,7 +133,7 @@ def manager_init():
     # new iab network
     print('Assigning network roles...')
     iab_network = IabNet(srn_list)
-    iab_network.apply_roles(NodeRoleSequences.DEFAULT_11_SRN_SEQUENCE)
+    iab_network.apply_roles(NodeRoleSequences.DEFAULT_15_SRN_SEQUENCE)
     # iab_network.apply_roles(NodeRoleSequences.DEFAULT_5_SRN_SEQUENCE)
 
     print("Init Done")
@@ -120,9 +141,15 @@ def manager_init():
 
 
 if __name__ == '__main__':
-    iab_net = manager_init()
-    #PromptWorker(iab_net).do_iab_node("add 5 4")
-    #PromptWorker(iab_net).do_iab_node("set 45 parent donor")
-    #PromptWorker(iab_net).do_iab_node("start 45")
+    parser = argparse.ArgumentParser(description='IAB-Manager')
+    parser.add_argument('-r', '--reservation', type=str, required=True)
+
+    args = parser.parse_args()
+    iab_net = manager_init(args.reservation)
+    #PromptWorker(iab_net).do_rf_scenario("start 10011")
+    PromptWorker(iab_net).do_donor("start")
+    PromptWorker(iab_net).do_iab_node("add 52 51")
+    PromptWorker(iab_net).do_iab_node("set 5152 parent donor")
+    PromptWorker(iab_net).do_iab_node("start 5152")
     #PromptWorker(iab_net).do_test('tp down core donor')
     PromptWorker(iab_net).cmdloop()

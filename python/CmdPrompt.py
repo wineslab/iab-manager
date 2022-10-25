@@ -11,7 +11,7 @@ class PromptWorker(cmd.Cmd):
 
     iab_net: IabNet
 
-    def __init__(self,iab_net):
+    def __init__(self, iab_net):
         self.iab_net = iab_net
         super().__init__()
 
@@ -128,7 +128,9 @@ class PromptWorker(cmd.Cmd):
                 print(usage_str)
 
     def do_iab_node(self, args: str):
-        usage_str = "Usage: iab-node {add | del | status | start | stop | set parent {donor | node id}}}} {{du_id} {mt_id} | iab_id}"
+        usage_str = "Usage:\t iab_node add {{du_id} {mt_id}}\n"\
+            "\t\tdel | status | start | stop {iab_id}\n"\
+            "\t\tset {iab_id} parent  {donor | node id}"
         args = args.split()
         if len(args) < 2:
             print(usage_str)
@@ -185,7 +187,7 @@ class PromptWorker(cmd.Cmd):
                 except NetElNotFoundException:
                     print("IAB node {} not found".format(args[1]))
                     return
-                IabNodeActions.start(iab_n, iab_net=self.iab_net)
+                IabNodeActions.start(iab_n, self.iab_net)
             case 'stop':
                 if len(args) != 2:
                     print(usage_str)
@@ -211,7 +213,7 @@ class PromptWorker(cmd.Cmd):
                             case 'donor':
                                 IabNodeActions.set_parent(iab_n, self.iab_net.donor)
                             case 'node':
-                                if len(args) != 5:
+                                if len(args) != 4:
                                     print(usage_str)
                                     return
                                 try:
@@ -323,7 +325,7 @@ class PromptWorker(cmd.Cmd):
                 dst = self.iab_net.donor
 
             case 'iab_node':
-                if len(args) < 4 - (1-dst_arg_offset):
+                if len(args) < 6 - (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
@@ -333,7 +335,7 @@ class PromptWorker(cmd.Cmd):
                     return
 
             case 'mt':
-                if len(args) < 4 - (1-dst_arg_offset):
+                if len(args) < 6 - (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
@@ -343,7 +345,7 @@ class PromptWorker(cmd.Cmd):
                     return
 
             case 'du':
-                if len(args) < 4 + (1-dst_arg_offset):
+                if len(args) < 6 + (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
@@ -353,7 +355,7 @@ class PromptWorker(cmd.Cmd):
                     return
 
             case 'ue':
-                if len(args) < 4 - (1-dst_arg_offset):
+                if len(args) < 6 - (1-dst_arg_offset):
                     print(usage_str)
                     return
                 try:
