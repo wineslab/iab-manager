@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # first check if softmodem is running
-if pgrep 'softmodem' > /dev/null; then
+if ps x | grep ran.py > /dev/null; then
         echo "Softmodem running..."
 else
         echo "Softmodem not running, exiting..."; exit 1
@@ -9,7 +9,7 @@ fi
 
 stop_loop=false
 ln_check="============================================"
-max_trials=21
+max_trials=30
 trials=0
 while [ "$stop_loop" = false ]
 do

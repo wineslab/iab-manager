@@ -5,7 +5,7 @@ class ShCommands:
     START_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh start nrf spgwu && ip route add 12.1.1.0/24 via 192.168.70.134'
     STOP_CORE = 'cd oai-cn5g-fed/docker-compose/; ./core-network.sh stop nrf spgwu'
     CORE_STATUS_WCL = 'docker ps | wc -l'
-    SOFTMODEM_STATUS_WCL = 'pgrep softmodem | wc -l'
+    SOFTMODEM_STATUS_WCL = 'ps x | grep ran.py | grep -v grep | wc -l'
     START_UE_TMUX = 'tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t ue -f\''
     STOP_SOFTMODEM = 'kill $(pgrep softmodem)'
     START_DONOR_TMUX = 'tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t donor -f\''
