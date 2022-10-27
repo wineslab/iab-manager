@@ -4,7 +4,8 @@ import cmd
 
 from python.CmdActions import CoreActions, NetActions, DonorActions, MtActions, UeActions, DuActions, IabNodeActions, \
     NetTestActions
-from python.NetElements import IabNet, NetElNotFoundException
+from python.NetElements import NetElNotFoundException
+from python.IabNet import IabNet
 
 
 class PromptWorker(cmd.Cmd):
@@ -213,7 +214,7 @@ class PromptWorker(cmd.Cmd):
                             case 'donor':
                                 IabNodeActions.set_parent(iab_n, self.iab_net.donor)
                             case 'node':
-                                if len(args) != 4:
+                                if len(args) != 5:
                                     print(usage_str)
                                     return
                                 try:

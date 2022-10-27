@@ -1,4 +1,5 @@
-from python.NetElements import IabNet, Mt, Ue, Du, IabNode
+from python.NetElements import Mt, Ue, Du, IabNode
+from python.IabNet import IabNet
 import python.NetTests as NetTests
 from python.TaskManager import TaskManager
 

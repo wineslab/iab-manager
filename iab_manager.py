@@ -3,13 +3,14 @@
 
 from pathlib import Path
 from python.SRN import Srn, SrnTypes
-from python.NetElements import IabNet, NodeRoleSequences
+from python.IabNet import IabNet
 from python.CmdPrompt import PromptWorker
 from fabric import Connection
 import os
 import requests
 from dotenv import load_dotenv
 import argparse
+import networkx as nx
 
 load_dotenv()
 
@@ -90,12 +91,11 @@ def get_snr_fromlist(snr_list: list, col0_prefix: str, **kwargs):
     return snr_list
 
 
-def manager_init(reservation_id):
+def manager_init(reservation_id: str, topology: nx.Graph):
 
     local = True if Path("/core_srn").is_file() else False
 
     if not local:
-
         # create and test gateway connection
         print("Initializing gateway connection...")
         gw_conn = Connection(host='colosseum-gw', user=COLOSSEUM_USER)
@@ -113,28 +113,15 @@ def manager_init(reservation_id):
             else:
                 srn.push_srn_type('core')
             srn.stat_srn_type()
-            # srn.connection.put(local='bash/run_ue.sh', remote='/root/')
-            # srn.connection.run('chmod +x run_ue.sh', hide=True)
-            # assert srn.test_ssh_conn()
-            # print('Testing srn connections... ' + str(round((s_i/len(srn_list))*100)) + 'done', end='\r')
-
-    # gw_conn = Connection(host='colosseum-gw', user='eugeniomoro')
-    # ep_conn = Connection(host='wineslab-001', user='root', gateway=gw_conn, connect_kwargs={"password": "pass"})
-    # # get srn ip and id
-    # get_snr_id_cmd = "ip -f inet addr show col0 | grep -Po 'inet \K[\d.]+'"
-    # col0_self_ip = ep_conn.run(get_snr_id_cmd, hide=True).stdout.strip()
-    # octects = col0_self_ip.split(".")
-    # self_id = octects[-1]
-    # col0_prefix = octects[0] + "." + octects[1] + "." + octects[2] + "."
-    #
-    # srn_list = parse_reservation('reservation_126023.json')
-    # srn_list = get_snr_fromlist(srn_list, col0_prefix, conn_gw=gw_conn)
+        # srn.connection.put(local='bash/run_ue.sh', remote='/root/')
+        # srn.connection.run('chmod +x run_ue.sh', hide=True)
+        # assert srn.test_ssh_conn()
+        # print('Testing srn connections... ' + str(round((s_i/len(srn_list))*100)) + 'done', end='\r')
 
     # new iab network
     print('Assigning network roles...')
     iab_network = IabNet(srn_list)
-    iab_network.apply_roles(NodeRoleSequences.DEFAULT_15_SRN_SEQUENCE)
-    # iab_network.apply_roles(NodeRoleSequences.DEFAULT_5_SRN_SEQUENCE)
+    iab_network.apply_roles(topology)
 
     print("Init Done")
     return iab_network
@@ -143,13 +130,26 @@ def manager_init(reservation_id):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='IAB-Manager')
     parser.add_argument('-r', '--reservation', type=str, required=True)
-
+    parser.add_argument('-t', '--topology', type=str)
     args = parser.parse_args()
-    iab_net = manager_init(args.reservation)
+
+    T = nx.read_graphml(args.topology)
+
+    iab_net = manager_init(args.reservation, T)
+    # for d in iab_net.donor_list:
+    #     d.start()  # 23
+    # print(f'DUs: {iab_net.du_list}')
+    # print(f'MTs: {iab_net.mt_list}')
+    # iab_net.add_iab_node(iab_net.get_mt_by_id(24), iab_net.get_du_by_id(28))
+    # n1 = iab_net.get_iab_by_id(2428)
+    # n1.set_parent(iab_net.donor)
+
     #PromptWorker(iab_net).do_rf_scenario("start 10011")
-    PromptWorker(iab_net).do_donor("start")
-    PromptWorker(iab_net).do_iab_node("add 29 28")
-    PromptWorker(iab_net).do_iab_node("set 2829 parent donor")
-    #PromptWorker(iab_net).do_iab_node("start 2829")
+    # PromptWorker(iab_net).do_donor("start")
+    # PromptWorker(iab_net).do_iab_node("add 28 24")
+    # PromptWorker(iab_net).do_iab_node("set 2428 parent donor")
+    # PromptWorker(iab_net).do_iab_node("start 2428")
+    # PromptWorker(iab_net).do_iab_node("add 30 29")
+    # PromptWorker(iab_net).do_iab_node("set 2930 parent node 2428")
     #PromptWorker(iab_net).do_test('tp down core donor')
     PromptWorker(iab_net).cmdloop()
