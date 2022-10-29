@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # first check if softmodem is running
-if ps x | grep ran.py > /dev/null; then
+nproc=`ps x | grep ran.py | wc -l`
+if  [ "$nproc" -gt 1 ]> /dev/null; then
         echo "Softmodem running..."
 else
         echo "Softmodem not running, exiting..."; exit 1
@@ -9,12 +10,17 @@ fi
 
 stop_loop=false
 ln_check="============================================"
-max_trials=30
+max_trials=60
 trials=0
 while [ "$stop_loop" = false ]
 do
 ##      echo "trial $trials"
         let "trials++"
+        nproc=`ps x | grep ran.py | wc -l`
+        if  [ "$nproc" -lt 2 ]> /dev/null; then
+                echo "Ran.py died, exiting..."
+                exit 1
+        fi
         if [ $max_trials -eq $trials ]; then
                 echo "Max trial reached, exiting..."
                 exit 1
@@ -26,6 +32,6 @@ do
                 exit 0
         else
                 echo "Softmodem not ready, waiting 1 second...";
-                sleep 1
+                sleep 10
         fi
 done

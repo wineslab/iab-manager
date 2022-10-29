@@ -7,12 +7,13 @@ from python.ShStringUtils import ShCommands, NetIdentities
 from python.NetRoles import NetRoles
 import networkx as nx
 from python.NetElements import Core, Donor, Du, Mt, Ue, IabNode, NetRoleMappingFailed, NetElem, NetElNotFoundException
+import io
+import json
 
 
 class IabNet:
     snr_list: List[Srn]
     core: Core
-    donor: Donor
     du_list: List[Du]
     mt_list: List[Mt]
     ue_list: List[Ue]
@@ -24,12 +25,13 @@ class IabNet:
         self.mt_list = []
         self.ue_list = []
         self.donor_list = []
+        self.netelem_list = []
         # TODO: this assumes that 0 is always core. Either make it mandatory and assert or generalize
         # Where do we deploy the ric?
         self.core = Core(snr_list[0])
         self.iab_list = []
 
-    def apply_roles(self, topology: nx.Graph):
+    def apply_roles(self, topology: nx.DiGraph):
         self.topology = topology
         # check if enough snr
         if len(topology) > len(self.snr_list):
@@ -38,18 +40,30 @@ class IabNet:
             # check if snr supports role
             srn = self.snr_list[seq+1]
             if self.snr_list[seq+1].supports_role(d['role']):
+                netelem = None
                 # role is supported, so create new NetElem accordingly
                 match d['role']:
                     case NetRoles.DONOR:
-                        self.donor_list.append(Donor(srn))
+                        netelem = Donor(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        self.donor_list.append(netelem)
                     case NetRoles.MT:
-                        self.mt_list.append(Mt(srn))
+                        netelem = Mt(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        self.mt_list.append(netelem)
                     case NetRoles.DU:
-                        self.du_list.append(Du(srn))
+                        netelem = Du(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        self.du_list.append(netelem)
                     case NetRoles.UE:
-                        self.ue_list.append(Ue(srn))
+                        netelem = Ue(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        self.ue_list.append(netelem)
+                    case default:
+                        raise NetRoleMappingFailed
+
                 # save srn in graph
+                d['netelem'] = netelem
+                print(srn, d['role'], n, d['radio_id'], d['channel'], d['prb'])
                 d['srn'] = srn
+                self.netelem_list.append(netelem)
+
                 # save role in srn
                 srn.net_role = d['role']
             else:
@@ -60,25 +74,40 @@ class IabNet:
                 target=donor.srn.get_tr0_ip(), nh=donor.srn.get_col0_ip())
             donor.srn.add_ip_route(
                 target=self.core.get_tr0_ip(), nh=self.core.srn.get_col0_ip())
-        self.create_iab_nodes()
 
     def create_iab_nodes(self):
         iab_nodes = {}
         for n, d in self.topology.nodes(data=True):
-            if d['role'] == 'mt':
+            if d['role'] == NetRoles.MT:
                 try:
-                    iab_nodes[d['iab_parent']]['mt'] = n
+                    iab_nodes[d['iab']]['mt'] = d['netelem']
                 except KeyError:
-                    iab_nodes[d['iab_parent']] = {'mt': n}
-            elif d['role'] == 'du':
+                    iab_nodes[d['iab']] = {'mt': d['netelem']}
+            elif d['role'] == NetRoles.DU:
                 try:
-                    iab_nodes[d['iab_parent']]['du'] = n
+                    iab_nodes[d['iab']]['du'] = d['netelem']
                 except KeyError:
-                    iab_nodes[d['iab_parent']] = {'du': n}
+                    iab_nodes[d['iab']] = {'du': d['netelem']}
             else:
                 pass
         for iab_node, val in iab_nodes.items():
             self.add_iab_node(val['mt'], val['du'])
+            # TODO: Maybe add_iab_node should return the node itself
+            iab_node = self.get_iab_by_id(f"{val['mt'].id}{val['du'].id}")
+            nexthops = list(self.topology[val['mt'].topo_id])
+            assert(len(nexthops) == 1)
+            assert(self.topology[val['mt'].topo_id][nexthops[0]]['type'] == 'wireless')
+            iab_node.set_parent(self.topology.nodes[nexthops[0]]['netelem'])
+
+    def push_radiomap(self, tot_nodes):
+        # Generate the radiomap based on the assigned SRN and radio_ids
+        self.radiomap = {f"Node {n}": "None" for n in range(1, tot_nodes+1)}
+        for n in self.netelem_list:
+            self.radiomap[f"Node {n.radio_id}"] = {"SRN": n.id, "RadioA": 1, "RadioB": 2}
+        json_radiomap = io.StringIO(json.dumps(self.radiomap))
+        if not self.core.srn.connected:
+            self.core.srn.connect()
+        self.core.srn.connection.put(json_radiomap, '/root/radiomap.json')
 
     def __get_netel_by_id(self, net_id, lst: List[NetElem]):
         for net_el in lst:
@@ -91,6 +120,9 @@ class IabNet:
 
     def get_du_by_id(self, nid: str | int) -> Du:
         return self.__get_netel_by_id(int(nid), self.du_list)
+
+    def get_donor_by_id(self, nid: str | int) -> Donor:
+        return self.__get_netel_by_id(int(nid), self.donor_list)
 
     def get_ue_by_id(self, nid: str | int) -> Ue:
         return self.__get_netel_by_id(int(nid), self.ue_list)
@@ -114,8 +146,8 @@ class IabNet:
         iab_n.mt.iab_node = None
         self.iab_list.remove(iab_n)
 
-    def start_rf_scenario(self, s_id):
-        self.core.srn.run_command(ShCommands.start_rf_scenario(s_id))
+    def start_rf_scenario(self, s_id, radiomap=False):
+        self.core.srn.run_command(ShCommands.start_rf_scenario(s_id, radiomap))
 
     def stop_rf_scenario(self):
         self.core.srn.run_command(ShCommands.STOP_RF_SCENARIO)

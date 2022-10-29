@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import cmd
+from python.MyCmd import MyCmd
 
-from python.CmdActions import CoreActions, NetActions, DonorActions, MtActions, UeActions, DuActions, IabNodeActions, \
+from python.CmdActions import CoreActions, DonorActions, MtActions, UeActions, DuActions, IabNodeActions, \
     NetTestActions
 from python.NetElements import NetElNotFoundException
 from python.IabNet import IabNet
+import sys
 
 
-class PromptWorker(cmd.Cmd):
+class PromptWorker(MyCmd):
 
     iab_net: IabNet
 
@@ -19,11 +21,12 @@ class PromptWorker(cmd.Cmd):
     def do_help(self, arg: str) -> bool | None:
         print("Todo: help page")
 
-    def do_list_mt(self, arg: str):
-        print(len(self.iab_net.mt_list))
-
-    def do_core(self, act: str):
-        match act:
+    def do_core(self, args: str):
+        args = args.split()
+        if len(args) < 1:
+            print("Usage: core ACTION")
+            return
+        match args[0]:
             case 'start':
                 if not CoreActions.core_status_action(self.iab_net):
                     CoreActions.core_start_action(self.iab_net)
@@ -34,19 +37,30 @@ class PromptWorker(cmd.Cmd):
                 CoreActions.core_status_action(self.iab_net)
             case 'stop -f':
                 CoreActions.core_stop_action(self.iab_net)
+            case 'tail':
+                if len(args) == 2:
+                    self.iab_net.core.tail(args[1])
+                if len(args) == 1:
+                    self.iab_net.core.tail()
+                else:
+                    print("Usage: core tail [n]")
+                    return
+
             case _:
                 print("Unrecognized action")
 
     def do_list(self, target: str):
         match target:
+            case 'donor':
+                print(self.iab_net.donor_list)
             case 'mt':
-                NetActions.print_mt_list(self.iab_net)
+                print(self.iab_net.mt_list)
             case 'du':
-                NetActions.print_du_list(self.iab_net)
+                print(self.iab_net.du_list)
             case 'ue':
-                NetActions.print_ue_list(self.iab_net)
+                print(self.iab_net.ue_list)
             case 'iab_node':
-                NetActions.print_iab_node_list(self.iab_net)
+                print(self.iab_net.iab_list)
             case _:
                 print("Unrecognized action")
 
@@ -68,6 +82,10 @@ class PromptWorker(cmd.Cmd):
                 MtActions.start(mt)
             case 'stop':
                 MtActions.stop(mt)
+            case 'tail':
+                mt.tail()
+            case 'kill':
+                mt.kill()
             case _:
                 print('Action {} not recognized'.format(args[1]))
 
@@ -89,6 +107,10 @@ class PromptWorker(cmd.Cmd):
                 UeActions.start(ue)
             case 'stop':
                 UeActions.stop(ue)
+            case 'tail':
+                ue.tail()
+            case 'kill':
+                ue.kill()
             case _:
                 print('Action {} not recognized'.format(args[1]))
 
@@ -110,28 +132,42 @@ class PromptWorker(cmd.Cmd):
                 DuActions.start(du)
             case 'stop':
                 DuActions.stop(du)
+            case 'tail':
+                du.tail()
+            case 'kill':
+                du.kill()
             case _:
                 print('Action {} not recognized'.format(args[1]))
 
     def do_donor(self, args: str):
-        usage_str = "Usage: donor {start | stop | status}"
-        if args is None:
-            print(usage_str)
+        args = args.split()
+        if len(args) < 2:
+            print("Usage: donor ID ACTION")
             return
-        match args:
-            case 'start':
-                DonorActions.start(self.iab_net)
-            case 'stop':
-                DonorActions.stop(self.iab_net)
+        try:
+            donor = self.iab_net.get_donor_by_id(int(args[0]))
+        except NetElNotFoundException:
+            print("DU not found")
+            return
+
+        match args[1]:
             case 'status':
-                DonorActions.status(self.iab_net)
+                DonorActions.status(donor)
+            case 'start':
+                DonorActions.start(donor)
+            case 'stop':
+                DonorActions.stop(donor)
+            case 'tail':
+                donor.tail()
+            case 'kill':
+                donor.kill()
             case _:
-                print(usage_str)
+                print('Action {} not recognized'.format(args[1]))
 
     def do_iab_node(self, args: str):
-        usage_str = "Usage:\t iab_node add {{du_id} {mt_id}}\n"\
-            "\t\tdel | status | start | stop {iab_id}\n"\
-            "\t\tset {iab_id} parent  {donor | node id}"
+        usage_str = "Usage:\t iab_node add {{du_id} {mt_id}}\n"
+        "\t\tdel | status | start | stop {iab_id}\n"
+        "\t\tset {iab_id} parent  {donor | node id}"
         args = args.split()
         if len(args) < 2:
             print(usage_str)
@@ -174,7 +210,7 @@ class PromptWorker(cmd.Cmd):
                 except NetElNotFoundException:
                     print("IAB node {} not found".format(args[1]))
                     return
-                print(iab_n.tostring())
+                print(iab_n)
                 if iab_n.mt is not None:
                     MtActions.status(iab_n.mt)
                 if iab_n.du is not None:
@@ -231,16 +267,18 @@ class PromptWorker(cmd.Cmd):
                 return
 
     def do_rf_scenario(self, args: str):
+        # TODO: find a way to know the number of nodes in the rf scenario
         if args == '':
-            print("Usage: rf_scenario {start id| stop}")
+            print("Usage: rf_scenario {start id n_nodes| stop}")
             return
         args = args.split()
         match args[0]:
             case 'start':
-                if len(args) != 2:
-                    print("Usage: rf_scenario {start | stop} id")
+                if len(args) != 3:
+                    print("Usage: rf_scenario {start id n_nodes | stop}")
                     return
-                self.iab_net.start_rf_scenario(args[1])
+                self.iab_net.push_radiomap(int(args[2]))
+                self.iab_net.start_rf_scenario(args[1], True)
             case 'stop':
                 self.iab_net.stop_rf_scenario()
 

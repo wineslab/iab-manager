@@ -1,4 +1,4 @@
-from python.NetElements import Mt, Ue, Du, IabNode
+from python.NetElements import Donor, Mt, Ue, Du, IabNode
 from python.IabNet import IabNet
 import python.NetTests as NetTests
 from python.TaskManager import TaskManager
@@ -32,30 +32,11 @@ class CoreActions:
             print("Failed")
 
 
-class NetActions:
-
-    @staticmethod
-    def print_mt_list(iab_net: IabNet):
-        print(iab_net.mt_list_tostring())
-
-    @staticmethod
-    def print_du_list(iab_net: IabNet):
-        print(iab_net.du_list_tostring())
-
-    @staticmethod
-    def print_ue_list(iab_net: IabNet):
-        print(iab_net.ue_list_tostring())
-
-    @staticmethod
-    def print_iab_node_list(iab_net: IabNet):
-        print(iab_net.iab_node_list_tostring())
-
-
 class DonorActions:
     @staticmethod
-    def status(iab_net: IabNet):
+    def status(donor: Donor):
         print("Checking Donor status...")
-        if iab_net.donor.status():
+        if donor.status():
             print("Donor running")
             return True
         else:
@@ -63,16 +44,16 @@ class DonorActions:
             return False
 
     @staticmethod
-    def start(iab_net: IabNet):
-        if not DonorActions.status(iab_net):
+    def start(donor: Donor):
+        if not DonorActions.status(donor):
             print("Starting donor in tmux")
-            iab_net.donor.start_disown()
+            donor.start_disown()
 
     @staticmethod
-    def stop(iab_net: IabNet):
-        if DonorActions.status(iab_net):
+    def stop(donor: Donor):
+        if DonorActions.status(donor):
             print("Stopping donor")
-            iab_net.donor.stop()
+            donor.stop()
 
 
 class MtActions:

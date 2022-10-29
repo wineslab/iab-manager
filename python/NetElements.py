@@ -33,11 +33,6 @@ class NetElem:
     def __repr__(self):
         return str(self)
 
-    def set_commands(self, **kwargs):
-        self.stop_cmd = kwargs.get('stop_cmd')
-        self.start_cmd = kwargs.get('start_cmd')
-        self.status_cmd = kwargs.get('status_cmd')
-
     def start(self):
         return self.srn.run_command(self.start_cmd)
 
@@ -82,58 +77,78 @@ class NetElem:
         return self.srn.start_iperf_client_iface(use_tmux, server_addr, self.iperf_bind_iface, **kwargs)
 
 
-class Du(NetElem):
+class RadioElem(NetElem):
+    pullrepos_cmd = ShCommands.PULL_REPOS
+
+    def __init__(self, srn, topo_id, radio_id, channel=0, prb=106):
+        self.topo_id = topo_id
+        self.channel = channel
+        self.prb = prb
+        self.radio_id = radio_id
+        super().__init__(srn)
+
+    def start(self):
+        return self.srn.run_command(self.start_cmd.format(self.prb, self.channel))
+
+    def start_disown(self):
+        return self.srn.run_command_disown(self.start_cmd.format(self.prb, self.channel))
+
+    def status(self):
+        res = super().status()
+        if res:
+            return int(res.stdout.strip()) >= 1
+
+    def tail(self):
+        self.srn.run_command_no_hide(ShCommands.TAIL_RADIONODE)
+
+    def kill(self):
+        self.srn.run_command(ShCommands.KILL9_SOFTMODEM)
+
+
+class Donor(RadioElem):
+    start_cmd = ShCommands.START_DONOR_TMUX
+    stop_cmd = ShCommands.STOP_SOFTMODEM
+    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+    iperf_bind_iface = SrnIfaces.TR
+
+    children_list: List[IabNode]  # This might be replaced by networkx topology
+
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
+
+
+class Du(RadioElem):
     start_cmd = ShCommands.START_DU_TMUX
     stop_cmd = ShCommands.STOP_SOFTMODEM
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
     iab_node: IabNode = None
     iperf_bind_iface = SrnIfaces.TR
 
-    def __init__(self, srn):
-        super().__init__(srn)
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
         self.mt = None
 
-    def status(self):
-        res = super().status()
-        if res:
-            return int(res.stdout.strip()) >= 1
 
-
-class Mt(NetElem):
+class Mt(RadioElem):
     start_cmd = ShCommands.START_UE_TMUX
     stop_cmd = ShCommands.STOP_SOFTMODEM
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
     iab_node = None
     iperf_bind_iface = SrnIfaces.UE_TUN
 
-    def __init__(self, srn, channel=0, prb=106):
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
         self.du = None
-        self.channel = channel
-        self.prb = prb
-        super().__init__(srn)
-
-    def status(self):
-        res = super().status()
-        if res:
-            return int(res.stdout.strip()) >= 1
 
 
-class Ue(NetElem):
+class Ue(RadioElem):
     start_cmd = ShCommands.START_UE_TMUX
     stop_cmd = ShCommands.STOP_SOFTMODEM
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
     iperf_bind_iface = SrnIfaces.UE_TUN
 
-    def __init__(self, srn, channel=0, prb=106):
-        self.associated_bs = None
-        self.channel = channel
-        self.prb = prb
-        super().__init__(srn)
-
-    def status(self):
-        res = super().status()
-        if res:
-            return int(res.stdout.strip()) >= 1
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
 
 
 class Core(NetElem):
@@ -142,7 +157,7 @@ class Core(NetElem):
     status_cmd = ShCommands.CORE_STATUS_WCL
     iperf_bind_iface = SrnIfaces.DOCKER_NET
 
-    def __int__(self, srn):
+    def __init__(self, srn):
         super().__init__(srn)
 
     def status(self):
@@ -154,6 +169,9 @@ class Core(NetElem):
         res = self.srn.run_command_no_hide(self.start_cmd)
         return (res and self.srn.add_ip_route(target=NetIdentities.BROAD_TR_NET,
                                               nh=NetIdentities.SPGWU))
+
+    def tail(self, lines=10):
+        self.srn.run_command_no_hide(ShCommands.TAIL_CORE.format(lines))
 
     def add_ip_route_in_spgwu(self, target, nh):
         res = self.srn.run_command(
@@ -185,7 +203,7 @@ class IabNode:
         self.du = du
         self.mt = mt
         self.id = str(mt.srn.id) + str(du.srn.id)
-        self.srn = du.srn  # this is done by choice, it could be mt as well
+        self.srn = du.srn  # this is done by choice, it could be mt as well #G: Do we need it anywhere? we always use self.du.srn or self.mt.srn
 
     def set_parent(self, parent):
         self.parent = parent
@@ -227,25 +245,6 @@ class IabNode:
 
     def get_tun_ep(self):
         return self.mt.srn.get_tun_ep()
-
-
-class Donor(NetElem):
-    start_cmd = ShCommands.START_DONOR_TMUX
-    stop_cmd = ShCommands.STOP_SOFTMODEM
-    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
-    iperf_bind_iface = SrnIfaces.TR
-
-    children_list: List[IabNode]
-
-    def __init__(self, srn, channel=0, prb=106):
-        self.channel = channel
-        self.prb = prb
-        super().__init__(srn)
-
-    def status(self):
-        res = super().status()
-        if res:
-            return int(res.stdout.strip()) >= 1
 
 
 class NetElNotFoundException(Exception):

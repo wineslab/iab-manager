@@ -1,0 +1,5 @@
+reservation_id: 129838
+topology: "topologies/toy1.graphml"
+scenario: 20058
+scenario_nodes: 10
+srn_blacklist: [5, 10, 64, 60]
