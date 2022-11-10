@@ -80,18 +80,19 @@ class NetElem:
 class RadioElem(NetElem):
     pullrepos_cmd = ShCommands.PULL_REPOS
 
-    def __init__(self, srn, topo_id, radio_id, channel=0, prb=106):
+    def __init__(self, srn, topo_id, radio_id, channel=0, prb=106, nonrtric_url='http://127.0.0.1'):
         self.topo_id = topo_id
         self.channel = channel
         self.prb = prb
         self.radio_id = radio_id
+        self.nonrtric_url = nonrtric_url
         super().__init__(srn)
 
     def start(self):
-        return self.srn.run_command(self.start_cmd.format(self.prb, self.channel))
+        return self.srn.run_command(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel))
 
     def start_disown(self):
-        return self.srn.run_command_disown(self.start_cmd.format(self.prb, self.channel))
+        return self.srn.run_command_disown(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel))
 
     def status(self):
         res = super().status()
@@ -149,6 +150,31 @@ class Ue(RadioElem):
 
     def __init__(self, *args, **kargs):
         super().__init__(*args, **kargs)
+
+
+class Sounder(RadioElem):
+    '''Net element that enables the scan mode of a ue, which do channel hopping and report the available gNBs'''
+    start_cmd = ShCommands.START_SOUNDER_TMUX
+    stop_cmd = ShCommands.STOP_SOUNDER
+    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
+
+    def start(self):
+        return self.srn.run_command(self.start_cmd.format(self.nonrtric_url, self.prb))
+
+    def start_disown(self):
+        return self.srn.run_command_disown(self.start_cmd.format(self.nonrtric_url, self.prb))
+
+    def status(self):
+        return 0  # To implement
+
+    def tail(self):
+        self.srn.run_command_no_hide(ShCommands.TAIL_RADIONODE)
+
+    def kill(self):
+        self.srn.run_command(ShCommands.STOP_SOUNDER)
 
 
 class Core(NetElem):

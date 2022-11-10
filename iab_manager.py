@@ -9,6 +9,7 @@ from python.SRN import Srn, SrnTypes
 from python.IabNet import IabNet
 from python.CmdPrompt import PromptWorker
 from fabric import Connection
+from typing import List
 import os
 import requests
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -48,7 +49,7 @@ def get_reservation(session_id, reservation_id):
     return response.json()
 
 
-def parse_snr_from_reservation(reservation_id: str, blacklist: list[int]):
+def parse_snr_from_reservation(reservation_id: str, blacklist: list[int]) -> List[Srn]:
     session = login_colosseum()
     data = get_reservation(session, reservation_id)[0]
     snr_list = []
@@ -61,41 +62,8 @@ def parse_snr_from_reservation(reservation_id: str, blacklist: list[int]):
     return snr_list
 
 
-def scan_subnet(entry_point: Connection, col0_prefix: str, **kwargs):
-    id_range = kwargs.get('id_range', range(1, 100))
-    use_arp = kwargs.get('use_arp', False)
-    snr_list = []
-    for host in id_range:
-        if use_arp:
-            if entry_point.run("arpsend -D -e {} col0 -c 1".format(col0_prefix + str(host)), warn=True,
-                               hide=True).exited == 3:
-                snr_list.append(host)
-        else:
-            if entry_point.run("ping -c 1 " + col0_prefix + str(host), hide=True):
-                snr_list.append(host)
-
-
-def get_snr_fromlist(snr_list: list, col0_prefix: str, **kwargs):
-    c_gw = kwargs.get('conn_gw', False)
-    for host in snr_list:
-        print("SRN found at " + col0_prefix + str(host))
-        s = Srn(ip=(col0_prefix + str(host)), id=str(host), conn_gw=c_gw)
-        snr_list.append(s)
-
-        # test ssh connection
-        s.test_ssh_conn()
-        print("---SSH connection established")
-
-        # retrieve type
-        s.stat_srn_type()
-        print("---SRN Type: " + str(s.type))
-    return snr_list
-
-
-def manager_init(args):
+def manager_init(args, sounding):
     topology: nx.DiGraph = nx.read_graphml(args.topology)
-    assert(nx.is_directed(topology))
-    assert(nx.is_tree(topology))
 
     local = True if Path("/core_srn").is_file() else False
     gw_conn = None
@@ -111,21 +79,29 @@ def manager_init(args):
     print('Testing srn connections...')
     for s_i, srn in enumerate(srn_list):
         srn.conn_gw = gw_conn
-        if s_i > 1:
-            srn.push_srn_type('ran')
+        try:
+            srn.stat_srn_type()
+        except Exception as e:
+            print(f"Error {e} connecting to {srn}")
+        if srn.type == SrnTypes.RAN:
+            # Push some files to the RAN
+            srn.connection.put(local='bash/conf.json', remote='/root/OAI-Colosseum/conf.json')
+            srn.connection.put(local='bash/check_ue_ready.sh', remote='/root/check_ue_ready.sh')
+            srn.connection.run('chmod +x /root/check_ue_ready.sh', hide=True)
         else:
-            srn.push_srn_type('core')
-        srn.stat_srn_type()
-        srn.connection.put(local='bash/check_ue_ready.sh', remote='/root/')
-        srn.connection.run('chmod +x /root/check_ue_ready.sh', hide=True)
-    # assert srn.test_ssh_conn()
-    # print('Testing srn connections... ' + str(round((s_i/len(srn_list))*100)) + 'done', end='\r')
+            # Core
+            pass
 
     # new iab network
     print('Assigning network roles...')
     iab_network = IabNet(srn_list)
-    iab_network.apply_roles(topology)
-    iab_network.create_iab_nodes()
+    if sounding:
+        iab_network.apply_roles_sounding(topology)
+    else:
+        assert(nx.is_directed(topology))
+        assert(nx.is_tree(topology))
+        iab_network.apply_roles(topology)
+        iab_network.create_iab_nodes()
 
     print("Init Done")
     return iab_network
@@ -140,9 +116,9 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--srn_blacklist', type=int, action='append', help="list of blacklisted srn")
     args = parser.parse_args()
 
-    iab_net = manager_init(args)
-
-    #PromptWorker(iab_net).do_rf_scenario(f'start {args.scenario} {args.scenario_nodes}')
+    iab_net = manager_init(args, sounding=True)
+    PromptWorker(iab_net).do_rf_scenario("stop")
+    PromptWorker(iab_net).do_rf_scenario(f'start {args.scenario} {args.scenario_nodes}')
     # iab_net.core.start()
     # for d in iab_net.donor_list:
     #     d.start()  # 23
@@ -152,7 +128,6 @@ if __name__ == '__main__':
     # n1 = iab_net.get_iab_by_id(2428)
     # n1.set_parent(iab_net.donor)
 
-    # PromptWorker(iab_net).do_rf_scenario("start 10011")
     # PromptWorker(iab_net).do_donor("start")
     # PromptWorker(iab_net).do_iab_node("add 28 24")
     # PromptWorker(iab_net).do_iab_node("set 2428 parent donor")

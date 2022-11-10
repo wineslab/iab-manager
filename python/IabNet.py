@@ -1,14 +1,16 @@
 from __future__ import annotations
 from ast import Index
 from re import I
-from python.SRN import Srn, SrnIfaces
+from python.SRN import Srn, SrnTypes
 from typing import List
 from python.ShStringUtils import ShCommands, NetIdentities
 from python.NetRoles import NetRoles
 import networkx as nx
-from python.NetElements import Core, Donor, Du, Mt, Ue, IabNode, NetRoleMappingFailed, NetElem, NetElNotFoundException
+from python.NetElements import Core, Donor, Du, Mt, Ue, Sounder, IabNode, NetRoleMappingFailed, NetElem, NetElNotFoundException
 import io
 import json
+import random
+import subprocess
 
 
 class IabNet:
@@ -17,6 +19,8 @@ class IabNet:
     du_list: List[Du]
     mt_list: List[Mt]
     ue_list: List[Ue]
+    donor_list: List[Donor]
+    sounder_list: List[Sounder]
     iab_list: List[IabNode]
 
     def __init__(self, snr_list: list[Srn]):
@@ -24,14 +28,25 @@ class IabNet:
         self.du_list = []
         self.mt_list = []
         self.ue_list = []
+        self.sounder_list = []
         self.donor_list = []
         self.netelem_list = []
-        # TODO: this assumes that 0 is always core. Either make it mandatory and assert or generalize
-        # Where do we deploy the ric?
-        self.core = Core(snr_list[0])
         self.iab_list = []
 
+        # Get core
+        core = [n for n in snr_list if n.type == SrnTypes.CORE]
+        assert(len(core) == 1)
+        self.core = Core(core[0])
+        # TODO: implement real nonrtric instead of relaying from core to local machine
+        nonrtric = [n for n in snr_list if n.type == SrnTypes.CORE]
+        assert(len(nonrtric) == 1)
+        self.nonrtric = self.core
+        self.nonrtric_url = f'http://{self.nonrtric.srn.get_col0_ip()}'
+        # Reverse tunnel on the core to have local nonrtric
+        subprocess.Popen(f"""ssh -N -R {self.nonrtric.srn.get_col0_ip()}:3904:localhost:3904 {self.nonrtric.srn.hostname}""", shell=True)
+
     def apply_roles(self, topology: nx.DiGraph):
+        '''Instantiate the network from the topology by mapping each network role to the right iab role'''
         self.topology = topology
         # check if enough snr
         if len(topology) > len(self.snr_list):
@@ -44,16 +59,16 @@ class IabNet:
                 # role is supported, so create new NetElem accordingly
                 match d['role']:
                     case NetRoles.DONOR:
-                        netelem = Donor(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        netelem = Donor(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.donor_list.append(netelem)
                     case NetRoles.MT:
-                        netelem = Mt(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        netelem = Mt(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.mt_list.append(netelem)
                     case NetRoles.DU:
-                        netelem = Du(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        netelem = Du(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.du_list.append(netelem)
                     case NetRoles.UE:
-                        netelem = Ue(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'])
+                        netelem = Ue(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.ue_list.append(netelem)
                     case default:
                         raise NetRoleMappingFailed
@@ -74,6 +89,51 @@ class IabNet:
                 target=donor.srn.get_tr0_ip(), nh=donor.srn.get_col0_ip())
             donor.srn.add_ip_route(
                 target=self.core.get_tr0_ip(), nh=self.core.srn.get_col0_ip())
+
+    def apply_roles_sounding(self, topology: nx.DiGraph):
+        '''Instantiate the network from the topology by replacing MT with a sound and assigns a random channel to each Donor'''
+
+        self.topology = topology
+        # check if enough snr
+        print(f"Topology has {len(topology)} nodes and we have {len(self.snr_list)} SRNs")
+        if len(topology) > len(self.snr_list):
+            raise NetRoleMappingFailed(f"Role sequence list {len(topology)} longer than available snrs {len(self.snr_list)}")
+        for seq, (n, d) in enumerate(topology.nodes(data=True)):
+            # check if snr supports role
+            srn = self.snr_list[seq+1]
+            if self.snr_list[seq+1].supports_role(d['role']):
+                netelem = None
+                # role is supported, so create new NetElem accordingly
+                match d['role']:
+                    case NetRoles.DONOR:
+                        ch = random.randint(0, 7)  # maximum number of channels
+                        netelem = Donor(srn, n, d['index'], channel=ch, prb=24, nonrtric_url=self.nonrtric_url)
+                        print(srn, d['role'], n, d['index'], ch)
+                        self.donor_list.append(netelem)
+                    case NetRoles.MT:
+                        netelem = Sounder(srn, n, d['index'], prb=24, nonrtric_url=self.nonrtric_url)
+                        self.sounder_list.append(netelem)
+                        print(srn, d['role'], n, d['index'], '-1')
+                    case NetRoles.DU:
+                        ch = random.randint(0, 7)  # maximum number of channels
+                        netelem = Donor(srn, n, d['index'], channel=ch, prb=24, nonrtric_url=self.nonrtric_url)
+                        print(srn, d['role'], n, d['index'], ch)
+                        self.donor_list.append(netelem)
+                    case NetRoles.UE:
+                        pass  # We ignore UE for now
+                    case default:
+                        raise NetRoleMappingFailed
+
+                # save srn in graph
+                d['netelem'] = netelem
+
+                d['srn'] = srn
+                self.netelem_list.append(netelem)
+
+                # save role in srn
+                srn.net_role = d['role']
+            else:
+                raise NetRoleMappingFailed
 
     def create_iab_nodes(self):
         iab_nodes = {}
@@ -109,26 +169,29 @@ class IabNet:
             self.core.srn.connect()
         self.core.srn.connection.put(json_radiomap, '/root/radiomap.json')
 
-    def __get_netel_by_id(self, net_id, lst: List[NetElem]):
+    def _get_netel_by_id(self, net_id, lst: List[NetElem]):
         for net_el in lst:
             if net_el.id == net_id:
                 return net_el
         raise NetElNotFoundException
 
     def get_mt_by_id(self, nid: str | int) -> Mt:
-        return self.__get_netel_by_id(int(nid), self.mt_list)
+        return self._get_netel_by_id(int(nid), self.mt_list)
 
     def get_du_by_id(self, nid: str | int) -> Du:
-        return self.__get_netel_by_id(int(nid), self.du_list)
+        return self._get_netel_by_id(int(nid), self.du_list)
 
     def get_donor_by_id(self, nid: str | int) -> Donor:
-        return self.__get_netel_by_id(int(nid), self.donor_list)
+        return self._get_netel_by_id(int(nid), self.donor_list)
 
     def get_ue_by_id(self, nid: str | int) -> Ue:
-        return self.__get_netel_by_id(int(nid), self.ue_list)
+        return self._get_netel_by_id(int(nid), self.ue_list)
 
     def get_iab_by_id(self, iid: str | int) -> IabNode:
-        return self.__get_netel_by_id(str(iid), self.iab_list)
+        return self._get_netel_by_id(str(iid), self.iab_list)
+
+    def get_sounder_by_id(self, nid: str | int) -> Sounder:
+        return self._get_netel_by_id(int(nid), self.sounder_list)
 
     def add_iab_node(self, mt, du):
         if mt.iab_node is None and du.iab_node is None:

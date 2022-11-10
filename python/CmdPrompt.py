@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import cmd
 from python.MyCmd import MyCmd
 
-from python.CmdActions import CoreActions, DonorActions, MtActions, UeActions, DuActions, IabNodeActions, \
+from python.CmdActions import IabNodeActions, \
     NetTestActions
 from python.NetElements import NetElNotFoundException
 from python.IabNet import IabNet
-import sys
 
 
 class PromptWorker(MyCmd):
@@ -28,13 +26,22 @@ class PromptWorker(MyCmd):
             return
         match args[0]:
             case 'start':
-                if not CoreActions.core_status_action(self.iab_net):
-                    CoreActions.core_start_action(self.iab_net)
+                if not self.iab_net.core.status():
+                    if self.iab_net.core.start():
+                        print("Done")
+                    else:
+                        print("Failed")
             case 'stop':
-                if CoreActions.core_status_action(self.iab_net):
-                    CoreActions.core_stop_action(self.iab_net)
+                if self.iab_net.core.status():
+                    if self.iab_net.core.stop():
+                        print("Done")
+                    else:
+                        print("Failed")
             case 'status':
-                CoreActions.core_status_action(self.iab_net)
+                if self.iab_net.core.status():
+                    print("Core running")
+                else:
+                    print("Core not running")
             case 'stop -f':
                 CoreActions.core_stop_action(self.iab_net)
             case 'tail':
@@ -61,108 +68,79 @@ class PromptWorker(MyCmd):
                 print(self.iab_net.ue_list)
             case 'iab_node':
                 print(self.iab_net.iab_list)
+            case 'sounder':
+                print(self.iab_net.sounder_list)
             case _:
                 print("Unrecognized action")
 
-    def do_mt(self, args: str):
+    def _do_generic(self, args, type):
         args = args.split()
+        match type:
+            case 'du':
+                nodes = self.iab_net.du_list
+            case 'mt':
+                nodes = self.iab_net.mt_list
+            case 'ue':
+                nodes = self.iab_net.ue_list
+            case 'donor':
+                nodes = self.iab_net.donor_list
+            case 'sounder':
+                nodes = self.iab_net.sounder_list
+            case default:
+                print("Node type wrong")
+                return
         if len(args) < 2:
-            print("Usage: mt ID ACTION")
-            return
-        try:
-            mt = self.iab_net.get_mt_by_id(int(args[0]))
-        except NetElNotFoundException:
-            print("MT not found")
+            print(f"Usage: {type} ID | all ACTION")
             return
 
-        match args[1]:
-            case 'status':
-                MtActions.status(mt)
-            case 'start':
-                MtActions.start(mt)
-            case 'stop':
-                MtActions.stop(mt)
-            case 'tail':
-                mt.tail()
-            case 'kill':
-                mt.kill()
-            case _:
-                print('Action {} not recognized'.format(args[1]))
+        if args[0] == 'all':
+            # If 'all' we apply the command to all the list, else we select one
+            pass
+        elif args[0].isdigit():
+            try:
+                nodes = [self.iab_net._get_netel_by_id(int(args[0]), nodes)]
+            except NetElNotFoundException:
+                print(f"{type} {args[0]} not found")
+                return
+        else:
+            print(f"Usage: {type} ID | all ACTION")
+            return
+        for n in nodes:
+            match args[1]:
+                case 'status':
+                    print(f"Checking {type} {n.id} status...")
+                    if n.status():
+                        print(f"{type} {n.id} running")
+                    else:
+                        print(f"{type} {n.id} not running")
+                case 'start':
+                    if not n.status():
+                        n.start()
+                case 'stop':
+                    if n.status():
+                        n.stop()
+                case 'tail':
+                    if n.status():
+                        n.tail()
+                case 'kill':
+                    n.kill()
+                case _:
+                    print(f'Action {args[1]} not recognized')
+
+    def do_mt(self, args: str):
+        return self._do_generic(args, 'mt')
 
     def do_ue(self, args: str):
-        args = args.split()
-        if len(args) < 2:
-            print("Usage: ue ID ACTION")
-            return
-        try:
-            ue = self.iab_net.get_ue_by_id(int(args[0]))
-        except NetElNotFoundException:
-            print("UE not found")
-            return
+        return self._do_generic(args, 'ue')
 
-        match args[1]:
-            case 'status':
-                UeActions.status(ue)
-            case 'start':
-                UeActions.start(ue)
-            case 'stop':
-                UeActions.stop(ue)
-            case 'tail':
-                ue.tail()
-            case 'kill':
-                ue.kill()
-            case _:
-                print('Action {} not recognized'.format(args[1]))
+    def do_sounder(self, args: str):
+        return self._do_generic(args, 'sounder')
 
     def do_du(self, args: str):
-        args = args.split()
-        if len(args) < 2:
-            print("Usage: du ID ACTION")
-            return
-        try:
-            du = self.iab_net.get_du_by_id(int(args[0]))
-        except NetElNotFoundException:
-            print("DU not found")
-            return
-
-        match args[1]:
-            case 'status':
-                DuActions.status(du)
-            case 'start':
-                DuActions.start(du)
-            case 'stop':
-                DuActions.stop(du)
-            case 'tail':
-                du.tail()
-            case 'kill':
-                du.kill()
-            case _:
-                print('Action {} not recognized'.format(args[1]))
+        return self._do_generic(args, 'du')
 
     def do_donor(self, args: str):
-        args = args.split()
-        if len(args) < 2:
-            print("Usage: donor ID ACTION")
-            return
-        try:
-            donor = self.iab_net.get_donor_by_id(int(args[0]))
-        except NetElNotFoundException:
-            print("DU not found")
-            return
-
-        match args[1]:
-            case 'status':
-                DonorActions.status(donor)
-            case 'start':
-                DonorActions.start(donor)
-            case 'stop':
-                DonorActions.stop(donor)
-            case 'tail':
-                donor.tail()
-            case 'kill':
-                donor.kill()
-            case _:
-                print('Action {} not recognized'.format(args[1]))
+        return self._do_generic(args, 'donor')
 
     def do_iab_node(self, args: str):
         usage_str = "Usage:\t iab_node add {{du_id} {mt_id}}\n"
@@ -189,7 +167,10 @@ class PromptWorker(MyCmd):
                 except NetElNotFoundException:
                     print("MT {} not found".format(mt_id))
                     return
-                IabNodeActions.add(mt=mt, du=du, iab_net=self.iab_net)
+                if self.iab_net.add_iab_node(mt, du):
+                    print("Successfully added iab node with id {}".format(self.iab_net.iab_list[-1].id))
+                else:
+                    print('Add failed')
             case 'del':
                 if len(args) != 2:
                     print(usage_str)
@@ -199,7 +180,7 @@ class PromptWorker(MyCmd):
                 except NetElNotFoundException:
                     print("IAB node {} not found".format(args[1]))
                     return
-                IabNodeActions.delete(iab_n, self.iab_net)
+                self.iab_net.del_iab_node(iab_n)
                 print("IAB node {} removed".format(args[1]))
             case 'status':
                 if len(args) != 2:
@@ -212,9 +193,11 @@ class PromptWorker(MyCmd):
                     return
                 print(iab_n)
                 if iab_n.mt is not None:
-                    MtActions.status(iab_n.mt)
+                    if iab_n.mt.status():
+                        print(f"MT {iab_n.mt.id} running")
                 if iab_n.du is not None:
-                    DuActions.status(iab_n.du)
+                    if iab_n.du.status():
+                        print(f"DU {iab_n.du.id} running")
             case 'start':
                 if len(args) != 2:
                     print(usage_str)
@@ -234,7 +217,8 @@ class PromptWorker(MyCmd):
                 except NetElNotFoundException:
                     print("IAB node {} not found".format(args[1]))
                     return
-                IabNodeActions.stop(iab_n)
+                iab_n.stop()
+                print("Iab node {} stopped".format(iab_n.id))
             case 'set':
                 if len(args) <= 3:
                     print(usage_str)
@@ -247,8 +231,6 @@ class PromptWorker(MyCmd):
                 match args[2]:
                     case 'parent':
                         match args[3]:
-                            case 'donor':
-                                IabNodeActions.set_parent(iab_n, self.iab_net.donor)
                             case 'node':
                                 if len(args) != 5:
                                     print(usage_str)
@@ -258,7 +240,8 @@ class PromptWorker(MyCmd):
                                 except NetElNotFoundException:
                                     print("IAB node {} not found".format(args[4]))
                                     return
-                                IabNodeActions.set_parent(iab_n, parent_iab_n)
+                                print("Setting IAB node {} parent as {}".format(iab_n.id, parent_iab_n.id))
+                                iab_n.set_parent(parent_iab_n)
                     case _:
                         print(usage_str)
                         return
