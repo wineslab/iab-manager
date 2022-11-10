@@ -18,7 +18,11 @@ class IabNodeActions:
             print("IAB node {} has no mt".format(iab_node.id))
             return
         rt = True
-        iab_node.mt.start()
+        if not iab_node.mt.status():
+            print(f"Starting MT {iab_node.mt}")
+            iab_node.mt.start()
+        else:
+            print(f"MT {iab_node.mt} already running")
         print("Checking if MT {} is ready... (will wait 20s max)".format(iab_node.mt.id))
         if iab_node.mt.check_softmodem_ready():
             print("MT {} is ready".format(iab_node.mt.id))

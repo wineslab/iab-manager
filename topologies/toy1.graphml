@@ -64,16 +64,15 @@
     </node>
     <node id="8">
       <data key="d0">du</data>
-      <data key="d1">4</data>
+      <data key="d1">0</data>
       <data key="d2">24</data>
       <data key="d4">78</data>
       <data key="d3">9</data>
     </node>
     <node id="9">
-      <data key="d0">du</data>
-      <data key="d1">4</data>
+      <data key="d0">ue</data>
+      <data key="d1">0</data>
       <data key="d2">24</data>
-      <data key="d4">12</data>
       <data key="d3">10</data>
     </node>
     <edge source="1" target="0">

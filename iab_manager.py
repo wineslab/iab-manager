@@ -62,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--srn_blacklist', type=int, action='append', help="list of blacklisted srn")
     args = parser.parse_args()
 
-    iab_net = manager_init(args, sounding=True)
+    iab_net = manager_init(args, sounding=False)
     PromptWorker(iab_net).do_rf_scenario("stop")
     PromptWorker(iab_net).do_rf_scenario(f'start {args.scenario} {args.scenario_nodes}')
     # iab_net.core.start()

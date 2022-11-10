@@ -59,23 +59,23 @@ class IabNet:
                 # role is supported, so create new NetElem accordingly
                 match d['role']:
                     case NetRoles.DONOR:
-                        netelem = Donor(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Donor(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.donor_list.append(netelem)
                     case NetRoles.MT:
-                        netelem = Mt(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Mt(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.mt_list.append(netelem)
                     case NetRoles.DU:
-                        netelem = Du(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Du(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.du_list.append(netelem)
                     case NetRoles.UE:
-                        netelem = Ue(srn, n, d['radio_id'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Ue(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
                         self.ue_list.append(netelem)
                     case default:
                         raise NetRoleMappingFailed
 
                 # save srn in graph
                 d['netelem'] = netelem
-                print(srn, d['role'], n, d['radio_id'], d['channel'], d['prb'])
+                print(srn, d['role'], n, d['index'], d['channel'], d['prb'])
                 d['srn'] = srn
                 self.netelem_list.append(netelem)
 
@@ -160,7 +160,7 @@ class IabNet:
             iab_node.set_parent(self.topology.nodes[nexthops[0]]['netelem'])
 
     def push_radiomap(self, tot_nodes):
-        # Generate the radiomap based on the assigned SRN and radio_ids
+        # Generate the radiomap based on the assigned SRN and indexs
         self.radiomap = {f"Node {n}": "None" for n in range(1, tot_nodes+1)}
         for n in self.netelem_list:
             self.radiomap[f"Node {n.radio_id}"] = {"SRN": n.id, "RadioA": 1, "RadioB": 2}
