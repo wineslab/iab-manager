@@ -99,6 +99,9 @@ class Srn:
     def push_srn_type(self, s_type: str):
         self.run_command(ShCommands.PUSH_SRN_TYPE.format(s_type))
 
+    def push_topo_node(self, role, node_id):
+        self.run_command(ShCommands.PUSH_TOPO_NODE.format(role, node_id))
+
     def get_tun_ep(self):
         if self.iface_exists('oaitun_ue1'):
             res = self.run_command(ShCommands.GET_IFACE_IP.format('oaitun_ue1'))

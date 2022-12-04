@@ -2,7 +2,7 @@ from __future__ import annotations
 from ast import Index
 from re import I
 from python.SRN import Srn, SrnTypes
-from typing import List
+from typing import List, Generator
 from python.ShStringUtils import ShCommands, NetIdentities
 from python.NetRoles import NetRoles
 import networkx as nx
@@ -11,6 +11,7 @@ import io
 import json
 import random
 import subprocess
+import time
 
 
 class IabNet:
@@ -22,6 +23,7 @@ class IabNet:
     donor_list: List[Donor]
     sounder_list: List[Sounder]
     iab_list: List[IabNode]
+    netelem_list: List[NetElem]
 
     def __init__(self, snr_list: list[Srn]):
         self.snr_list = snr_list
@@ -43,9 +45,9 @@ class IabNet:
         self.nonrtric = self.core
         self.nonrtric_url = f'http://{self.nonrtric.srn.get_col0_ip()}'
         # Reverse tunnel on the core to have local nonrtric
-        subprocess.Popen(f"""ssh -N -R {self.nonrtric.srn.get_col0_ip()}:3904:localhost:3904 {self.nonrtric.srn.hostname}""", shell=True)
+        #subprocess.Popen(f"""ssh -N -R {self.nonrtric.srn.get_col0_ip()}:3904:localhost:3904 {self.nonrtric.srn.hostname}""", shell=True)
 
-    def apply_roles(self, topology: nx.DiGraph):
+    def apply_roles(self, topology: nx.DiGraph, if_freqs: int):
         '''Instantiate the network from the topology by mapping each network role to the right iab role'''
         self.topology = topology
         # check if enough snr
@@ -59,16 +61,16 @@ class IabNet:
                 # role is supported, so create new NetElem accordingly
                 match d['role']:
                     case NetRoles.DONOR:
-                        netelem = Donor(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Donor(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url, if_freqs=if_freqs)
                         self.donor_list.append(netelem)
                     case NetRoles.MT:
-                        netelem = Mt(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Mt(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url, if_freqs=if_freqs)
                         self.mt_list.append(netelem)
                     case NetRoles.DU:
-                        netelem = Du(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Du(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url, if_freqs=if_freqs)
                         self.du_list.append(netelem)
                     case NetRoles.UE:
-                        netelem = Ue(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url)
+                        netelem = Ue(srn, n, d['index'], channel=d['channel'], prb=d['prb'], nonrtric_url=self.nonrtric_url, if_freqs=if_freqs)
                         self.ue_list.append(netelem)
                     case default:
                         raise NetRoleMappingFailed
@@ -120,7 +122,9 @@ class IabNet:
                         print(srn, d['role'], n, d['index'], ch)
                         self.donor_list.append(netelem)
                     case NetRoles.UE:
-                        pass  # We ignore UE for now
+                        netelem = Sounder(srn, n, d['index'], prb=24, nonrtric_url=self.nonrtric_url)
+                        self.sounder_list.append(netelem)
+                        print(srn, d['role'], n, d['index'], '-1')
                     case default:
                         raise NetRoleMappingFailed
 
@@ -218,8 +222,14 @@ class IabNet:
     def update_iabnode_route(self, node: IabNode):
         # in mt, route to oai-net through mt's tun, first delete any
         node.mt.srn.run_command(ShCommands.del_ip_route(NetIdentities.DOCKER_NET))
-        node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
-                                 nh=node.mt.get_tun_ep())
+        res = node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
+                                       nh=node.mt.get_tun_ep())
+        if not res:
+            print("Couldn't add route to core from MT")
+            time.sleep(5)
+            if not node.mt.srn.add_ip_route(target=NetIdentities.DOCKER_NET,
+                                            nh=node.mt.get_tun_ep()):
+                return False
         # in du, route through mt col0
         #node.du.srn.add_ip_route(target=NetIdentities.DOCKER_NET, nh=node.mt.get)
         node.set_internal_route()
@@ -227,6 +237,21 @@ class IabNet:
         self.core.del_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip())
         self.core.add_ip_route_in_spgwu(target=node.du.srn.get_tr0_ip(),
                                         nh=node.mt.get_tun_ep())
+        return True
+
+    def get_srn_startup_order(self):
+        donors = [n for n in self.topology if self.topology.nodes[n]['role'] == 'donor']
+        for d in donors:
+            order = [d] + [successor for successors in dict(nx.bfs_successors(self.topology.to_undirected(as_view=True), d)).values()
+                           for successor in successors]
+            for o in order:
+                d = self.topology.nodes[o]
+                if d['role'] == 'du':
+                    yield d['netelem'].iab_node
+                elif d['role'] == 'mt':
+                    pass
+                else:
+                    yield d['netelem']
 
     def update_tree_routes(self):
         queue = []

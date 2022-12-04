@@ -4,16 +4,18 @@ from python.MyCmd import MyCmd
 
 from python.CmdActions import IabNodeActions, \
     NetTestActions
-from python.NetElements import NetElNotFoundException
+from python.NetElements import NetElNotFoundException, IabNode, Core, RadioElem
 from python.IabNet import IabNet
+from python.NetTests import ping_test, iperf_test
 
 
 class PromptWorker(MyCmd):
 
     iab_net: IabNet
 
-    def __init__(self, iab_net):
+    def __init__(self, iab_net, results_folder):
         self.iab_net = iab_net
+        self.results_folder = results_folder
         super().__init__()
 
     def do_help(self, arg: str) -> bool | None:
@@ -25,6 +27,12 @@ class PromptWorker(MyCmd):
             print("Usage: core ACTION")
             return
         match args[0]:
+            case 'restart':
+                if self.iab_net.core.status():
+                    if self.iab_net.core.restart():
+                        print("Done")
+                    else:
+                        print("Failed")
             case 'start':
                 if not self.iab_net.core.status():
                     if self.iab_net.core.start():
@@ -55,6 +63,29 @@ class PromptWorker(MyCmd):
 
             case _:
                 print("Unrecognized action")
+
+    def do_printmap(self, args):
+        print("SRN\t\tRole\tRadio\tTopo\tChannel\n")
+        print(f"{self.iab_net.core.srn.hostname}\tCore\tNA\tNA\tNA")
+        for n in self.iab_net.netelem_list:
+            try:
+                print(f"{n.srn.hostname}\t{n.type}\t{n.radio_id}\t{n.topo_id}\t{n.channel}")
+            except:
+                import pdb
+                pdb.set_trace()
+
+    def do_autostart(self, args):
+        for netelem in self.iab_net.get_srn_startup_order():
+            if type(netelem) == IabNode:
+                if not IabNodeActions.start(netelem, self.iab_net):
+                    return
+            else:
+                if not netelem.status():
+                    print(f"Starting {netelem}")
+                    if not netelem.start():
+                        return
+                else:
+                    print(f"{netelem} already running")
 
     def do_list(self, target: str):
         match target:
@@ -122,6 +153,10 @@ class PromptWorker(MyCmd):
                 case 'tail':
                     if n.status():
                         n.tail()
+                case 'ping':
+                    ping_test(n, f'{self.results_folder}/{self.iab_net.topo_name}')
+                case 'iperf':
+                    iperf_test(n, self.iab_net.core, direction=args[2], bw=args[3], out_dir=f'{self.results_folder}/{self.iab_net.topo_name}')
                 case 'kill':
                     n.kill()
                 case _:

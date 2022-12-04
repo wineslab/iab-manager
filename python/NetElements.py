@@ -16,6 +16,7 @@ class NetElem:
     def __init__(self, srn, **kwargs):
         self.srn = srn
         self.id = srn.id
+        self.type = self.__class__.__name__
 
     def __eq__(self, other):
         if isinstance(other, NetElem):
@@ -28,7 +29,7 @@ class NetElem:
             return NotImplemented
 
     def __str__(self):
-        return "{} id {}".format(self.__class__.__name__, str(self.srn.id))
+        return "{} id {}".format(self.type, str(self.srn.id))
 
     def __repr__(self):
         return str(self)
@@ -80,19 +81,21 @@ class NetElem:
 class RadioElem(NetElem):
     pullrepos_cmd = ShCommands.PULL_REPOS
 
-    def __init__(self, srn, topo_id, radio_id, channel=0, prb=106, nonrtric_url='http://127.0.0.1'):
+    def __init__(self, srn, topo_id, radio_id, channel=0, prb=106, nonrtric_url='http://127.0.0.1', if_freqs=0):
         self.topo_id = topo_id
         self.channel = channel
         self.prb = prb
         self.radio_id = radio_id
         self.nonrtric_url = nonrtric_url
+        self.if_freqs = if_freqs
         super().__init__(srn)
+        self.srn.push_topo_node(self.type, self.topo_id)
 
     def start(self):
-        return self.srn.run_command(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel))
+        return self.srn.run_command(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel, self.if_freqs))
 
     def start_disown(self):
-        return self.srn.run_command_disown(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel))
+        return self.srn.run_command_disown(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel, self.if_freqs))
 
     def status(self):
         res = super().status()
@@ -124,22 +127,11 @@ class Du(RadioElem):
     status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
     iab_node: IabNode = None
     iperf_bind_iface = SrnIfaces.TR
+    type = "Du"
 
     def __init__(self, *args, **kargs):
         super().__init__(*args, **kargs)
         self.mt = None
-
-
-class Mt(RadioElem):
-    start_cmd = ShCommands.START_UE_TMUX
-    stop_cmd = ShCommands.STOP_SOFTMODEM
-    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
-    iab_node = None
-    iperf_bind_iface = SrnIfaces.UE_TUN
-
-    def __init__(self, *args, **kargs):
-        super().__init__(*args, **kargs)
-        self.du = None
 
 
 class Ue(RadioElem):
@@ -152,7 +144,19 @@ class Ue(RadioElem):
         super().__init__(*args, **kargs)
 
 
-class Sounder(RadioElem):
+class Mt(Ue):
+    start_cmd = ShCommands.START_UE_TMUX
+    stop_cmd = ShCommands.STOP_SOFTMODEM
+    status_cmd = ShCommands.SOFTMODEM_STATUS_WCL
+    iab_node = None
+    iperf_bind_iface = SrnIfaces.UE_TUN
+
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
+        self.du = None
+
+
+class Sounder(Ue):
     '''Net element that enables the scan mode of a ue, which do channel hopping and report the available gNBs'''
     start_cmd = ShCommands.START_SOUNDER_TMUX
     stop_cmd = ShCommands.STOP_SOUNDER
@@ -193,6 +197,11 @@ class Core(NetElem):
 
     def start(self):
         res = self.srn.run_command_no_hide(self.start_cmd)
+        return (res and self.srn.add_ip_route(target=NetIdentities.BROAD_TR_NET,
+                                              nh=NetIdentities.SPGWU))
+
+    def restart(self):
+        res = self.srn.run_command_no_hide(ShCommands.RESTART_CORE)
         return (res and self.srn.add_ip_route(target=NetIdentities.BROAD_TR_NET,
                                               nh=NetIdentities.SPGWU))
 

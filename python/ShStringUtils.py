@@ -2,23 +2,26 @@ class ShCommands:
     UNAME = 'uname'
     CAT_SNR_TYPE = 'cat /snr_type'
     PUSH_SRN_TYPE = "echo \'{}\' > /srn_type"
+    PUSH_TOPO_NODE = "echo \'{} {}\' > /topo"
     START_CORE = 'cd oai-cn5g-fed/docker-compose/; docker-compose -f docker-compose-mini-nrf.yaml up -d && ip route add 12.1.1.0/24 via 192.168.70.134'
     STOP_CORE = 'cd oai-cn5g-fed/docker-compose/; docker-compose -f docker-compose-mini-nrf.yaml stop'
+    RESTART_CORE = 'docker restart oai-amf oai-spgwu'
     CORE_STATUS_WCL = 'docker ps | wc -l'
     TAIL_CORE = 'docker logs -n {} oai-amf'
     SOFTMODEM_STATUS_WCL = 'ps x | grep ran.py | grep -v grep | wc -l'
-    START_UE_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t ue -p {} -c {} -f\''
+    START_UE_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t ue -p {} -c {} -f --if_freq {}\''
     STOP_SOFTMODEM = 'kill $(pgrep softmodem)'
-    START_DONOR_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t donor  -p {} -c {} -f\''
-    START_DU_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t relay  -p {} -c {}  -f\''
-    START_SOUNDER_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t scan  -p {} -f\''
+    START_DONOR_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t donor  -p {} -c {} -f --if_freq {}\''
+    START_DU_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t relay  -p {} -c {}  -f --if_freq {}\''
+    START_SOUNDER_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t scan  -p {} -f --if_freq {}\''
     STOP_SOUNDER = 'kill -9 $(pgrep python)'
     PULL_REPOS = 'echo "8.8.8.8" > /etc/resolv.conf && ip r a default via  && cd /root/openairinterface5g/ && git pull && cd /root/OAI-Colosseum/ && git pull && ip r d default'
     TAIL_RADIONODE = 'tail -n 10 /root/last_log'
-    KILL9_SOFTMODEM = 'kill -9 $(pgrep softmodem)'
+    KILL9_SOFTMODEM = 'kill -9 $(pgrep softmodem); rm /root/last_log'
     CHECK_IFACE_EXISTS = 'ifconfig | grep {}'
     GET_IFACE_IP = r"ip -f inet addr show {} | sed -En -e 's/.*inet ([0-9.]+).*/\1/p'"
     SINGLE_PING = 'ping -c 1 -I {} {}'
+    PING = "ping -c 10 {}"
     START_RF_SCENARIO = 'colosseumcli rf start -c {}'
     START_RF_SCENARIO_RADIOMAP = 'colosseumcli rf start -m {} -c {}'
     STOP_RF_SCENARIO = 'colosseumcli rf stop'
@@ -26,7 +29,7 @@ class ShCommands:
     ADD_IP_ROUTE = 'ip route add {} via {}'
     DEL_IP_ROUTE = 'ip route del {}'
     DOCKER_EXEC_COMMAND_SPGWU = 'docker exec oai-spgwu {}'
-    START_IPERF3_SERVER_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3server 'iperf3 -s --bind {} --json'"
+    START_IPERF3_SERVER_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3server 'iperf3 -s --bFsleep d {} --json'"
     START_IPERF3_CLIENT_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3client 'iperf3 -c {} --bind {} {} " \
                                r"{}' "
     START_IPERF3_CLIENT = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; iperf3 -c {} --bind {} {} {} --json"

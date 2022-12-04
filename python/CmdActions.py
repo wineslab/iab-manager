@@ -9,14 +9,14 @@ class IabNodeActions:
     def start(iab_node: IabNode, iab_net: IabNet):
         if iab_node.parent is None:
             print("IAB node {} does not have a parent".format(iab_node.id))
-            return
+            return False
         print("Starting IAB node {}...".format(iab_node.id))
         if iab_node.du is None:
             print("IAB node {} has no du".format(iab_node.id))
-            return
+            return False
         if iab_node.mt is None:
             print("IAB node {} has no mt".format(iab_node.id))
-            return
+            return False
         rt = True
         if not iab_node.mt.status():
             print(f"Starting MT {iab_node.mt}")
@@ -28,13 +28,17 @@ class IabNodeActions:
             print("MT {} is ready".format(iab_node.mt.id))
         else:
             print("MT {} failed, aborting...".format(iab_node.mt.id))
-            return
+            return False
         print('Adding core routes')
-        iab_net.update_iabnode_route(iab_node)
-        print('Restarting DU..')
-        iab_node.du.stop()
-        iab_node.du.start()
-        print("Iab node {} started".format(iab_node.id))
+        if iab_net.update_iabnode_route(iab_node):
+            print('Restarting DU..')
+            iab_node.du.stop()
+            iab_node.du.start()
+            print("Iab node {} started".format(iab_node.id))
+            return True
+        else:
+            print(f"MT {iab_node.mt} has no gtpu tunnel")
+            return False
 
 
 class NetTestActions:
