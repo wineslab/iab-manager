@@ -1,6 +1,6 @@
 class NetRoles:
-    CORE = 0
-    DU = 1
-    MT = 2
-    UE = 3
-    DONOR = 4
+    CORE = 'core'
+    DU = 'du'
+    MT = 'mt'
+    UE = 'ue'
+    DONOR = 'donor'
