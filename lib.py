@@ -1,3 +1,5 @@
+import sys
+sys.path.append(__file__.rsplit("/", 1)[0])  # workaround for relative import
 from python.CmdActions import IabNodeActions
 from python.NetElements import IabNode
 from python.Colosseum import Colosseum
@@ -5,8 +7,7 @@ from fabric import Connection
 from python.IabNet import IabNet
 from pathlib import Path
 import networkx as nx
-import sys
-sys.path.append(__file__.rsplit("/", 1)[0])  # workaround for relative import
+
 
 
 class Iab:
