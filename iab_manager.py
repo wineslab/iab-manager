@@ -9,6 +9,28 @@ from python.Colosseum import Colosseum
 import time
 
 
+def lib_init(topology_xml, reservation_id, srn_blacklist):
+    topology = nx.parse_graphml(topology_xml)
+    assert(nx.is_directed(topology))
+    assert(nx.is_forest(topology))
+
+    colosseum = Colosseum()
+    local = True if Path("/core_srn").is_file() else False
+    if not local:
+        # create and test gateway connection
+        print("Initializing gateway connection...")
+        gw_conn = Connection(host='colosseum-gw', user=colosseum.colosseum_user)
+        if gw_conn.run('uname', hide=True, warn=False).failed:
+            raise Exception('Gateway connection failed')
+    srn_list = colosseum.parse_snr_from_reservation(reservation_id, srn_blacklist)
+    iab_network = IabNet(srn_list)
+
+    iab_network.apply_roles(topology, args.if_freqs)
+    iab_network.create_iab_nodes()
+
+    return iab_network
+
+
 def manager_init(args, sounding):
     topology: nx.DiGraph = nx.read_graphml(f'topologies/{args.topology}')
     colosseum = Colosseum()
