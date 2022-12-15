@@ -45,6 +45,7 @@ class IabNet:
         self.nonrtric = self.core
         self.nonrtric_url = f'http://{self.nonrtric.srn.get_col0_ip()}'
         # Reverse tunnel on the core to have local nonrtric
+        # It has some issues, better to run it manually from outside
         #subprocess.Popen(f"""ssh -N -R {self.nonrtric.srn.get_col0_ip()}:3904:localhost:3904 {self.nonrtric.srn.hostname}""", shell=True)
 
     def apply_roles(self, topology: nx.DiGraph, if_freqs: int):
@@ -91,53 +92,6 @@ class IabNet:
                 target=donor.srn.get_tr0_ip(), nh=donor.srn.get_col0_ip())
             donor.srn.add_ip_route(
                 target=self.core.get_tr0_ip(), nh=self.core.srn.get_col0_ip())
-
-    def apply_roles_sounding(self, topology: nx.DiGraph):
-        '''Instantiate the network from the topology by replacing MT with a sound and assigns a random channel to each Donor'''
-
-        self.topology = topology
-        # check if enough snr
-        print(f"Topology has {len(topology)} nodes and we have {len(self.snr_list)} SRNs")
-        if len(topology) > len(self.snr_list):
-            raise NetRoleMappingFailed(f"Role sequence list {len(topology)} longer than available snrs {len(self.snr_list)}")
-        for seq, (n, d) in enumerate(topology.nodes(data=True)):
-            # check if snr supports role
-            srn = self.snr_list[seq+1]
-            if self.snr_list[seq+1].supports_role(d['role']):
-                netelem = None
-                # role is supported, so create new NetElem accordingly
-                match d['role']:
-                    case NetRoles.DONOR:
-                        ch = random.randint(0, 7)  # maximum number of channels
-                        netelem = Donor(srn, n, d['index'], channel=ch, prb=24, nonrtric_url=self.nonrtric_url)
-                        print(srn, d['role'], n, d['index'], ch)
-                        self.donor_list.append(netelem)
-                    case NetRoles.MT:
-                        netelem = Sounder(srn, n, d['index'], prb=24, nonrtric_url=self.nonrtric_url)
-                        self.sounder_list.append(netelem)
-                        print(srn, d['role'], n, d['index'], '-1')
-                    case NetRoles.DU:
-                        ch = random.randint(0, 7)  # maximum number of channels
-                        netelem = Donor(srn, n, d['index'], channel=ch, prb=24, nonrtric_url=self.nonrtric_url)
-                        print(srn, d['role'], n, d['index'], ch)
-                        self.donor_list.append(netelem)
-                    case NetRoles.UE:
-                        netelem = Sounder(srn, n, d['index'], prb=24, nonrtric_url=self.nonrtric_url)
-                        self.sounder_list.append(netelem)
-                        print(srn, d['role'], n, d['index'], '-1')
-                    case default:
-                        raise NetRoleMappingFailed
-
-                # save srn in graph
-                d['netelem'] = netelem
-
-                d['srn'] = srn
-                self.netelem_list.append(netelem)
-
-                # save role in srn
-                srn.net_role = d['role']
-            else:
-                raise NetRoleMappingFailed
 
     def create_iab_nodes(self):
         iab_nodes = {}

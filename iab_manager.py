@@ -34,9 +34,10 @@ def manager_init(args, sounding):
         if srn.type == SrnTypes.RAN:
             pass
             # Push some files to the RAN
-            srn.connection.put(local='misc/conf.json', remote='/root/OAI-Colosseum/conf.json')
-            srn.connection.put(local='misc/base.conf', remote='/root/OAI-Colosseum/oai-confs/base.conf')
-            srn.connection.put(local='misc/server.py', remote='/root/openairinterface5g/openair3/O1/o1_proto/server.py')
+            print("Not updating local files, check that Image on colosseum is updated!")
+            # srn.connection.put(local='misc/conf.json', remote='/root/OAI-Colosseum/conf.json')
+            # srn.connection.put(local='misc/base.conf', remote='/root/OAI-Colosseum/oai-confs/base.conf')
+            # srn.connection.put(local='misc/server.py', remote='/root/openairinterface5g/openair3/O1/o1_proto/server.py')
             #srn.connection.put(local='bash/check_ue_ready.sh', remote='/root/check_ue_ready.sh')
             # srn.connection.run('chmod +x /root/check_ue_ready.sh', hide=True)
         else:
@@ -47,13 +48,10 @@ def manager_init(args, sounding):
     print('Assigning network roles...')
     iab_network = IabNet(srn_list)
     iab_network.topo_name = args.topology.split('.')[0]
-    if sounding:
-        iab_network.apply_roles_sounding(topology)
-    else:
-        assert(nx.is_directed(topology))
-        assert(nx.is_forest(topology))
-        iab_network.apply_roles(topology, args.if_freqs)
-        iab_network.create_iab_nodes()
+    assert(nx.is_directed(topology))
+    assert(nx.is_forest(topology))
+    iab_network.apply_roles(topology, args.if_freqs)
+    iab_network.create_iab_nodes()
 
     print("Init Done")
     return iab_network
@@ -70,25 +68,10 @@ if __name__ == '__main__':
     parser.add_argument('--if_freqs', type=int, required=True)
     args = parser.parse_args()
 
-    iab_net = manager_init(args, sounding=False)
+    iab_net = manager_init(args)
     #PromptWorker(iab_net,  args.results_folder).do_rf_scenario("stop")
-    # time.sleep(5)
+    #time.sleep(5)
     #PromptWorker(iab_net,  args.results_folder).do_rf_scenario(f'start {args.scenario} {args.scenario_nodes}')
     iab_net.core.start()
-    # for d in iab_net.donor_list:
-    #     d.start()  # 23
-    # print(f'DUs: {iab_net.du_list}')
-    # print(f'MTs: {iab_net.mt_list}')
-    # iab_net.add_iab_node(iab_net.get_mt_by_id(24), iab_net.get_du_by_id(28))
-    # n1 = iab_net.get_iab_by_id(2428)
-    # n1.set_parent(iab_net.donor)
-
-    # PromptWorker(iab_net).do_donor("start")
-    # PromptWorker(iab_net).do_iab_node("add 28 24")
-    # PromptWorker(iab_net).do_iab_node("set 2428 parent donor")
-    # PromptWorker(iab_net).do_iab_node("start 2428")
-    # PromptWorker(iab_net).do_iab_node("add 30 29")
-    # PromptWorker(iab_net).do_iab_node("set 2930 parent node 2428")
-    # PromptWorker(iab_net).do_test('tp down core donor')
 
     PromptWorker(iab_net, args.results_folder).cmdloop()
