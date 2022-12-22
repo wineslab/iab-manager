@@ -2,3 +2,5 @@ promise
 cryptography
 fabric
 python-dotenv
+numpy
+requests
