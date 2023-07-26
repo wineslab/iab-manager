@@ -56,8 +56,8 @@ class IabNet:
             raise NetRoleMappingFailed(f"Role sequence list {len(topology)} longer than available snrs {len(self.snr_list)}")
         for seq, (n, d) in enumerate(topology.nodes(data=True)):
             # check if snr supports role
-            srn = self.snr_list[seq+1]
-            if self.snr_list[seq+1].supports_role(d['role']):
+            srn = self.snr_list[seq]
+            if self.snr_list[seq].supports_role(d['role']):
                 netelem = None
                 # role is supported, so create new NetElem accordingly
                 match d['role']:
@@ -85,7 +85,8 @@ class IabNet:
                 # save role in srn
                 srn.net_role = d['role']
             else:
-                raise NetRoleMappingFailed
+                print(f"Node {seq} do not support RAN role")
+                continue
         # kind of an outlier in this function, we need to set core to donor routes
         for donor in self.donor_list:
             self.core.srn.add_ip_route(

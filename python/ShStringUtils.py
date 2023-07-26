@@ -9,11 +9,12 @@ class ShCommands:
     CORE_STATUS_WCL = 'docker ps | wc -l'
     TAIL_CORE = 'docker logs -n {} oai-amf'
     SOFTMODEM_STATUS_WCL = 'ps x | grep ran.py | grep -v grep | wc -l'
-    START_UE_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t ue -p {} -c {} -f --if_freq {}\''
+    START_UE_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t ue -p {} -c {} --if_freq {} {}\''
     STOP_SOFTMODEM = 'kill $(pgrep softmodem)'
-    START_DONOR_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t donor  -p {} -c {} -f --if_freq {}\''
-    START_DU_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t relay  -p {} -c {}  -f --if_freq {}\''
-    START_SOUNDER_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t scan  -p {} -f --if_freq {}\''
+    START_DONOR_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t donor  -p {} -c {} --if_freq {} {}\''
+    START_DU_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t relay  -p {} -c {}  --if_freq {} {}\''
+    START_SOUNDER_TMUX = 'MR_HOST={} tmux new-session -d -s ue_softmodem \'cd /root/OAI-Colosseum/ && python3.6 ran.py -t scan  -p {} -f --if_freq {} {}\''
+    CLEAN_ROUTES = """IFS=$'\n'; for ip in `ip r | grep -v kernel | grep -v can | sed s/"linkdown"// `; do IFS=' '; ip route del $ip; done """
     STOP_SOUNDER = 'kill -9 $(pgrep python)'
     PULL_REPOS = 'echo "8.8.8.8" > /etc/resolv.conf && ip r a default via  && cd /root/openairinterface5g/ && git pull && cd /root/OAI-Colosseum/ && git pull && ip r d default'
     TAIL_RADIONODE = 'tail -n 10 /root/last_log'
@@ -33,6 +34,8 @@ class ShCommands:
     START_IPERF3_CLIENT_TMUX = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; tmux new-session -d -s iperf3client 'iperf3 -c {} --bind {} {} " \
                                r"{}' "
     START_IPERF3_CLIENT = r"kill $(pgrep iperf) &> /dev/null || true; sleep '0.5'; iperf3 -c {} --bind {} {} {} --json"
+    START_PING_BACKGROUND = "mkdir -p ~/results/  && while true; do ping 192.168.70.129 | ts >  ~/ping.dat; done"
+    KILL_PING = "kill -9 $(pgrep ping)"
 
     @staticmethod
     def single_ping(bind_ip, dst_ip):

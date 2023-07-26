@@ -77,6 +77,10 @@ class NetElem:
     def start_iperf_client(self, use_tmux, server_addr, **kwargs):
         return self.srn.start_iperf_client_iface(use_tmux, server_addr, self.iperf_bind_iface, **kwargs)
 
+    def clean_routes(self):
+        #Clean custom routes we addedd
+        return self.srn.run_command_no_hide(ShCommands.CLEAN_ROUTES)
+
 
 class RadioElem(NetElem):
     pullrepos_cmd = ShCommands.PULL_REPOS
@@ -91,8 +95,12 @@ class RadioElem(NetElem):
         super().__init__(srn)
         self.srn.push_topo_node(self.type, self.topo_id)
 
-    def start(self):
-        return self.srn.run_command(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel, self.if_freqs))
+    def start(self, flash=False):
+        if flash:
+            cmd = self.start_cmd.format(self.nonrtric_url, self.prb, self.channel, self.if_freqs, '-f')
+        else:
+            cmd = self.start_cmd.format(self.nonrtric_url, self.prb, self.channel, self.if_freqs, '')
+        return self.srn.run_command(cmd)
 
     def start_disown(self):
         return self.srn.run_command_disown(self.start_cmd.format(self.nonrtric_url, self.prb, self.channel, self.if_freqs))
@@ -107,6 +115,14 @@ class RadioElem(NetElem):
 
     def kill(self):
         self.srn.run_command(ShCommands.KILL9_SOFTMODEM)
+    
+    def start_ping_bg(self):
+        if isinstance(self, Ue):
+            self.srn.add_ip_route(NetIdentities.DOCKER_NET, NetIdentities.SPGWU_TUN_EP)
+        self.srn.run_command_disown(ShCommands.START_PING_BACKGROUND)
+    
+    def kill_ping_bg(self):
+        self.srn.run_command(ShCommands.KILL_PING)
 
 
 class Donor(RadioElem):
@@ -166,7 +182,8 @@ class Sounder(Ue):
         super().__init__(*args, **kargs)
 
     def start(self):
-        return self.srn.run_command(self.start_cmd.format(self.nonrtric_url, self.prb))
+        if flash:
+            return self.srn.run_command(self.start_cmd.format(self.nonrtric_url, self.prb))
 
     def start_disown(self):
         return self.srn.run_command_disown(self.start_cmd.format(self.nonrtric_url, self.prb))

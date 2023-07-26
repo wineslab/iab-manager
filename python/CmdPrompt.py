@@ -21,6 +21,20 @@ class PromptWorker(MyCmd):
     def do_help(self, arg: str) -> bool | None:
         print("Todo: help page")
 
+    def do_cleanup(self, args):
+        #Kill everything in the RAN and clean all routes
+        print("Cleaning up the RAN")
+        ran = self.iab_net.ue_list + self.iab_net.du_list + self.iab_net.mt_list + self.iab_net.donor_list
+        for n in ran:
+            n.kill()
+            n.clean_routes()
+        
+        print("Cleaning up the core")
+        #restart and clean the core
+        self.iab_net.core.stop()
+        self.iab_net.core.clean_routes()
+        self.iab_net.core.start()
+
     def do_core(self, args: str):
         args = args.split()
         if len(args) < 1:
@@ -52,6 +66,8 @@ class PromptWorker(MyCmd):
                     print("Core not running")
             case 'stop -f':
                 CoreActions.core_stop_action(self.iab_net)
+            case 'clean':
+                self.iab_net.core.clean_routes()
             case 'tail':
                 if len(args) == 2:
                     self.iab_net.core.tail(args[1])
@@ -146,19 +162,30 @@ class PromptWorker(MyCmd):
                         print(f"{type} {n.id} not running")
                 case 'start':
                     if not n.status():
-                        n.start()
+                        flash : bool = len(args)>2 and args[2] == 'flash'
+                        n.start(flash=flash)
                 case 'stop':
                     if n.status():
                         n.stop()
                 case 'tail':
                     if n.status():
                         n.tail()
+                case 'bg_ping':
+                    n.start_ping_bg()
+                case 'stop_ping':
+                    n.kill_ping_bg()
+                    res = n.srn.run_command("cat ~/results/ping.dat")
+                    with open(f'{self.results_folder}/{self.iab_net.topo_name}/{n.topo_id}.rtt', 'w') as fw:
+                        fw.write(res.stdout)
                 case 'ping':
                     ping_test(n, f'{self.results_folder}/{self.iab_net.topo_name}')
                 case 'iperf':
                     iperf_test(n, self.iab_net.core, direction=args[2], bw=args[3], out_dir=f'{self.results_folder}/{self.iab_net.topo_name}')
                 case 'kill':
                     n.kill()
+                    n.clean_routes()
+                case 'clean':
+                    n.clean_routes()
                 case _:
                     print(f'Action {args[1]} not recognized')
 
